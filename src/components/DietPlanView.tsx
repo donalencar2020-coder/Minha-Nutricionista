@@ -44,19 +44,37 @@ export function DietPlanView({ userProfile }: { userProfile: any }) {
   }, [auth.currentUser?.uid]);
 
   const handleGeneratePlan = async () => {
-    if (!auth.currentUser || !userProfile) return;
+    console.log('DietPlanView: handleGeneratePlan called');
+    if (!auth.currentUser) {
+      console.warn('DietPlanView: No current user');
+      return;
+    }
+    if (!userProfile) {
+      console.warn('DietPlanView: No user profile');
+      return;
+    }
+    
     setGenerating(true);
+    console.log('DietPlanView: Generating plan for profile:', JSON.stringify(userProfile));
 
     try {
       const planData = await generateDietPlan(userProfile);
+      console.log('DietPlanView: Plan generated successfully:', JSON.stringify(planData));
       
       await addDoc(collection(db, 'dietPlans'), {
         uid: auth.currentUser.uid,
         ...planData,
         createdAt: new Date().toISOString(),
       });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'dietPlans');
+      console.log('DietPlanView: Plan saved to Firestore');
+    } catch (error: any) {
+      console.error('DietPlanView: Error generating or saving plan:', error);
+      // If it's a Gemini error, it might not be a Firestore error
+      if (error.message && (error.message.includes('quota') || error.message.includes('SAFETY') || error.message.includes('IA'))) {
+        alert(`Erro da IA: ${error.message}`);
+      } else {
+        handleFirestoreError(error, OperationType.WRITE, 'dietPlans');
+      }
     } finally {
       setGenerating(false);
     }
@@ -84,6 +102,7 @@ export function DietPlanView({ userProfile }: { userProfile: any }) {
         </div>
         
         <button
+          id="generate-plan-header-btn"
           onClick={handleGeneratePlan}
           disabled={generating}
           className="relative group overflow-hidden px-8 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-slate-200"
@@ -123,16 +142,15 @@ export function DietPlanView({ userProfile }: { userProfile: any }) {
                 ? 'Atualizamos nosso sistema para planos mais detalhados. Por favor, gere um novo plano para ver os detalhes.' 
                 : 'Nossa IA analisará seu perfil físico e metas para criar um plano alimentar otimizado e realista.'}
             </p>
-            {isOldFormat && (
-              <button
-                onClick={handleGeneratePlan}
-                disabled={generating}
-                className="mt-4 px-6 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-all flex items-center gap-2 mx-auto"
-              >
-                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                Gerar Novo Plano
-              </button>
-            )}
+            <button
+              id="generate-plan-empty-btn"
+              onClick={handleGeneratePlan}
+              disabled={generating}
+              className="mt-4 px-8 py-4 bg-orange-500 text-white font-black rounded-2xl hover:bg-orange-600 transition-all shadow-lg shadow-orange-100 flex items-center gap-3 mx-auto"
+            >
+              {generating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Sparkles className="w-5 h-5" />}
+              <span>{isOldFormat ? 'Gerar Novo Plano' : 'Criar Meu Plano Agora'}</span>
+            </button>
           </div>
         </motion.div>
       ) : (

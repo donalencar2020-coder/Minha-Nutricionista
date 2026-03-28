@@ -76,18 +76,25 @@ export function FoodAnalyzer({ userProfile, onAnalysisComplete }: { userProfile:
   };
 
   const handleAnalyze = async () => {
-    if ((!image && !textDescription.trim()) || !auth.currentUser) return;
+    console.log('FoodAnalyzer: handleAnalyze called', { hasImage: !!image, hasText: !!textDescription });
+    if ((!image && !textDescription.trim()) || !auth.currentUser) {
+      console.warn('FoodAnalyzer: Missing data or user', { image, textDescription, user: auth.currentUser?.uid });
+      return;
+    }
     setAnalyzing(true);
     setError(null);
 
     try {
       let analysis;
       if (image) {
+        console.log('FoodAnalyzer: Analyzing image...');
         analysis = await analyzeFoodImage(image, userProfile);
       } else {
+        console.log('FoodAnalyzer: Analyzing text:', textDescription);
         analysis = await analyzeFoodText(textDescription, userProfile);
       }
       
+      console.log('FoodAnalyzer: Analysis complete:', JSON.stringify(analysis));
       setResult(analysis);
       
       await addDoc(collection(db, 'meals'), {
@@ -97,11 +104,16 @@ export function FoodAnalyzer({ userProfile, onAnalysisComplete }: { userProfile:
         ...analysis,
         timestamp: new Date().toISOString(),
       });
+      console.log('FoodAnalyzer: Meal saved to Firestore');
       
       onAnalysisComplete();
     } catch (err: any) {
-      handleFirestoreError(err, OperationType.WRITE, 'meals');
+      console.error('FoodAnalyzer: Error during analysis or save:', err);
       setError(err.message || 'Falha ao analisar. Tente novamente.');
+      // If it's a Firestore error, handle it normally
+      if (err.message && err.message.includes('permission')) {
+        handleFirestoreError(err, OperationType.WRITE, 'meals');
+      }
     } finally {
       setAnalyzing(false);
     }

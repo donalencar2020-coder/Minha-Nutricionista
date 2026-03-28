@@ -9,7 +9,7 @@ import {
 import { LogIn, LogOut, Mail, Lock, UserPlus, Chrome, Loader2, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export function Auth() {
+export function Auth({ user }: { user: any }) {
   const [isEmailLogin, setIsEmailLogin] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
@@ -64,22 +64,25 @@ export function Auth() {
     }
   };
 
-  if (auth.currentUser) {
-    return (
-      <button
-        onClick={handleLogout}
-        className="flex items-center gap-2 px-4 py-2 text-sm font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all uppercase tracking-widest"
-      >
-        <LogOut className="w-4 h-4" />
-        Sair
-      </button>
-    );
-  }
-
   return (
     <div className="w-full max-w-sm mx-auto space-y-6">
       <AnimatePresence mode="wait">
-        {!isEmailLogin ? (
+        {user ? (
+          <motion.div
+            key="logged-in"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+          >
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-black text-red-500 hover:bg-red-50 rounded-2xl transition-all uppercase tracking-widest"
+            >
+              <LogOut className="w-4 h-4" />
+              Sair
+            </button>
+          </motion.div>
+        ) : !isEmailLogin ? (
           <motion.div
             key="social"
             initial={{ opacity: 0, y: 10 }}
@@ -112,7 +115,7 @@ export function Auth() {
             className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-50 space-y-6"
           >
             <div className="space-y-1">
-              <h3 className="text-xl font-black text-slate-900" key={isSignUp ? 'signup' : 'login'}>
+              <h3 className="text-xl font-black text-slate-900">
                 {isSignUp ? 'Criar Conta' : 'Entrar'}
               </h3>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Acesse sua jornada fitness</p>
@@ -177,7 +180,7 @@ export function Auth() {
                 onClick={() => setIsSignUp(!isSignUp)}
                 className="text-xs font-black text-slate-400 hover:text-orange-500 transition-colors uppercase tracking-widest"
               >
-                <span key={isSignUp ? 'has-account' : 'no-account'}>
+                <span>
                   {isSignUp ? 'Já tem uma conta? Entre' : 'Não tem conta? Crie uma'}
                 </span>
               </button>

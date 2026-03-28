@@ -1,6 +1,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+const getApiKey = () => {
+  const key = process.env.GEMINI_API_KEY;
+  if (!key) {
+    console.warn("GEMINI_API_KEY is not defined in the environment.");
+  }
+  return key || "";
+};
+
+const ai = new GoogleGenAI({ apiKey: getApiKey() });
 
 export interface FoodAnalysisResult {
   foodName: string;
@@ -12,6 +20,9 @@ export interface FoodAnalysisResult {
 }
 
 export async function analyzeFoodImage(base64Image: string, userContext?: any): Promise<FoodAnalysisResult> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Chave da API Gemini não configurada. Por favor, configure GEMINI_API_KEY.");
+  
   const model = "gemini-3-flash-preview";
   
   const contextPrompt = userContext ? `
@@ -74,6 +85,9 @@ export async function analyzeFoodImage(base64Image: string, userContext?: any): 
 }
 
 export async function analyzeFoodText(foodDescription: string, userContext?: any): Promise<FoodAnalysisResult> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Chave da API Gemini não configurada. Por favor, configure GEMINI_API_KEY.");
+
   const model = "gemini-3-flash-preview";
   
   const contextPrompt = userContext ? `
@@ -137,6 +151,9 @@ export interface DietPlan {
 }
 
 export async function generateDietPlan(userData: any): Promise<DietPlan> {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Chave da API Gemini não configurada. Por favor, configure GEMINI_API_KEY.");
+
   const model = "gemini-3-flash-preview";
   
   const prompt = `Com base nos seguintes dados do usuário, gere um plano de dieta saudável estruturado.
@@ -162,45 +179,51 @@ export async function generateDietPlan(userData: any): Promise<DietPlan> {
     "tips": ["dica 1", "dica 2"]
   }`;
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: {
-      systemInstruction: "Você é uma Nutricionista Rigorosa. Você cria planos de dieta focados em resultados reais e disciplina absoluta.",
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          dailyCalories: { type: Type.NUMBER },
-          macros: {
-            type: Type.OBJECT,
-            properties: {
-              protein: { type: Type.STRING },
-              carbs: { type: Type.STRING },
-              fat: { type: Type.STRING },
-            },
-            required: ["protein", "carbs", "fat"],
-          },
-          meals: {
-            type: Type.ARRAY,
-            items: {
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        systemInstruction: "Você é uma Nutricionista Rigorosa. Você cria planos de dieta focados em resultados reais e disciplina absoluta.",
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            dailyCalories: { type: Type.NUMBER },
+            macros: {
               type: Type.OBJECT,
               properties: {
-                name: { type: Type.STRING },
-                suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                time: { type: Type.STRING },
+                protein: { type: Type.STRING },
+                carbs: { type: Type.STRING },
+                fat: { type: Type.STRING },
               },
-              required: ["name", "suggestions", "time"],
+              required: ["protein", "carbs", "fat"],
             },
+            meals: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  name: { type: Type.STRING },
+                  suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
+                  time: { type: Type.STRING },
+                },
+                required: ["name", "suggestions", "time"],
+              },
+            },
+            tips: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          tips: { type: Type.ARRAY, items: { type: Type.STRING } },
+          required: ["dailyCalories", "macros", "meals", "tips"],
         },
-        required: ["dailyCalories", "macros", "meals", "tips"],
       },
-    },
-  });
+    });
 
-  return JSON.parse(response.text || "{}") as DietPlan;
+    if (!response.text) throw new Error("A IA não retornou uma resposta válida para o plano de dieta.");
+    return JSON.parse(response.text) as DietPlan;
+  } catch (error: any) {
+    console.error("Erro na geração do plano de dieta do Gemini:", error);
+    throw new Error(error.message || "Erro ao gerar o plano de dieta.");
+  }
 }
 
 export async function getDailyFeedback(meals: any[], userProfile: any): Promise<string> {
