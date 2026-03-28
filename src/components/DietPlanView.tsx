@@ -1,0 +1,245 @@
+import { useState, useEffect } from 'react';
+import { db, auth, OperationType, handleFirestoreError } from '../lib/firebase';
+import { collection, query, where, orderBy, onSnapshot, addDoc } from 'firebase/firestore';
+import { generateDietPlan, DietPlan } from '../services/gemini';
+import { 
+  ClipboardList, 
+  Sparkles, 
+  Loader2, 
+  Calendar, 
+  Clock, 
+  CheckCircle2, 
+  ChevronRight,
+  Flame,
+  Zap,
+  Info,
+  ShieldAlert
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+
+export function DietPlanView({ userProfile }: { userProfile: any }) {
+  const [plans, setPlans] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [generating, setGenerating] = useState(false);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    const q = query(
+      collection(db, 'dietPlans'),
+      where('uid', '==', auth.currentUser.uid)
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const planData = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }))
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setPlans(planData);
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'dietPlans');
+    });
+
+    return () => unsubscribe();
+  }, [auth.currentUser?.uid]);
+
+  const handleGeneratePlan = async () => {
+    if (!auth.currentUser || !userProfile) return;
+    setGenerating(true);
+
+    try {
+      const planData = await generateDietPlan(userProfile);
+      
+      await addDoc(collection(db, 'dietPlans'), {
+        uid: auth.currentUser.uid,
+        ...planData,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'dietPlans');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const latestPlan = plans[0] as (DietPlan & { createdAt: string, plan?: string }) | undefined;
+
+  // Check if the plan is in the old format (just a string)
+  const isOldFormat = latestPlan && latestPlan.plan && !latestPlan.meals;
+
+  return (
+    <div className="max-w-4xl mx-auto space-y-10 pb-12">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="space-y-1">
+          <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3">
+            <div className="p-2 bg-slate-900 rounded-2xl text-white shadow-lg shadow-slate-200">
+              <ClipboardList className="w-6 h-6" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-3xl font-black text-slate-900">Plano Alimentar</span>
+              <span className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Estratégia Nutri Rigorosa</span>
+            </div>
+          </h2>
+          <p className="text-slate-500 font-medium">Estratégia nutricional personalizada para seu objetivo.</p>
+        </div>
+        
+        <button
+          onClick={handleGeneratePlan}
+          disabled={generating}
+          className="relative group overflow-hidden px-8 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-slate-200"
+        >
+          {generating ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <Sparkles className="w-5 h-5 text-orange-400 group-hover:scale-125 transition-transform" />
+          )}
+          <span>{latestPlan ? 'Atualizar Estratégia' : 'Criar Meu Plano'}</span>
+        </button>
+      </header>
+
+      {loading ? (
+        <div className="flex flex-col items-center justify-center p-20 space-y-4">
+          <Loader2 className="w-12 h-12 animate-spin text-orange-500" />
+          <p className="text-slate-400 font-bold animate-pulse">Carregando seus planos...</p>
+        </div>
+      ) : !latestPlan || isOldFormat ? (
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="text-center p-16 bg-white rounded-[3rem] shadow-2xl border border-slate-100 space-y-8"
+        >
+          <div className="relative w-24 h-24 mx-auto">
+            <div className="absolute inset-0 bg-orange-500/20 rounded-full animate-ping" />
+            <div className="relative w-24 h-24 bg-orange-50 rounded-full flex items-center justify-center">
+              <Sparkles className="w-10 h-10 text-orange-500" />
+            </div>
+          </div>
+          <div className="space-y-3 max-w-sm mx-auto">
+            <h3 className="text-2xl font-black text-slate-900">
+              {isOldFormat ? 'Formato de plano antigo detectado' : 'Sua jornada começa aqui'}
+            </h3>
+            <p className="text-slate-500 leading-relaxed">
+              {isOldFormat 
+                ? 'Atualizamos nosso sistema para planos mais detalhados. Por favor, gere um novo plano para ver os detalhes.' 
+                : 'Nossa IA analisará seu perfil físico e metas para criar um plano alimentar otimizado e realista.'}
+            </p>
+            {isOldFormat && (
+              <button
+                onClick={handleGeneratePlan}
+                disabled={generating}
+                className="mt-4 px-6 py-3 bg-orange-500 text-white font-bold rounded-xl hover:bg-orange-600 transition-all flex items-center gap-2 mx-auto"
+              >
+                {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Gerar Novo Plano
+              </button>
+            )}
+          </div>
+        </motion.div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Sidebar Stats */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white shadow-2xl space-y-8 relative overflow-hidden">
+              <div className="absolute -right-4 -top-4 w-32 h-32 bg-orange-500/20 rounded-full blur-3xl" />
+              
+              <div className="space-y-2">
+                <p className="text-slate-400 text-sm font-bold uppercase tracking-widest">Meta Diária</p>
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-black">{latestPlan.dailyCalories}</span>
+                  <span className="text-orange-400 font-bold">kcal</span>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <p className="text-slate-400 text-xs font-bold uppercase tracking-widest">Distribuição de Macros</p>
+                <div className="space-y-3">
+                  <MacroItem label="Proteína" value={latestPlan.macros.protein} color="bg-orange-500" />
+                  <MacroItem label="Carbos" value={latestPlan.macros.carbs} color="bg-blue-500" />
+                  <MacroItem label="Gorduras" value={latestPlan.macros.fat} color="bg-emerald-500" />
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-[2.5rem] p-8 border border-slate-100 shadow-xl space-y-6">
+              <h4 className="font-black text-slate-900 flex items-center gap-2">
+                <ShieldAlert className="w-5 h-5 text-slate-900" />
+                Regras da Nutri
+              </h4>
+              <ul className="space-y-4">
+                {latestPlan.tips.map((tip, i) => (
+                  <li key={i} className="flex gap-3 text-sm text-slate-600 leading-relaxed">
+                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0" />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+
+          {/* Main Plan Content */}
+          <div className="lg:col-span-2 space-y-8">
+            <div className="flex items-center justify-between px-4">
+              <h3 className="text-2xl font-black text-slate-900">Estrutura de Refeições</h3>
+              <div className="flex items-center gap-2 text-slate-400 text-sm font-bold">
+                <Calendar className="w-4 h-4" />
+                {new Date(latestPlan.createdAt).toLocaleDateString('pt-BR')}
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {latestPlan.meals.map((meal, i) => (
+                <motion.div 
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.1 }}
+                  key={i} 
+                  className="group bg-white rounded-[2rem] p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:border-orange-100 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex gap-5">
+                      <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center group-hover:bg-orange-500 group-hover:text-white transition-colors">
+                        <Clock className="w-6 h-6" />
+                      </div>
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-black text-orange-500 uppercase tracking-tighter">{meal.time}</span>
+                          <h4 className="text-xl font-black text-slate-900">{meal.name}</h4>
+                        </div>
+                        <div className="flex flex-wrap gap-2 pt-2">
+                          {meal.suggestions.map((sug, j) => (
+                            <span key={j} className="px-3 py-1 bg-slate-50 text-slate-600 text-xs font-bold rounded-full border border-slate-100">
+                              {sug}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    <ChevronRight className="w-5 h-5 text-slate-300 group-hover:text-orange-500 transition-colors" />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MacroItem({ label, value, color }: { label: string, value: string, color: string }) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+        <span>{label}</span>
+        <span className="text-white">{value}</span>
+      </div>
+      <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
+        <motion.div 
+          initial={{ width: 0 }}
+          animate={{ width: '100%' }}
+          className={`h-full ${color}`} 
+        />
+      </div>
+    </div>
+  );
+}

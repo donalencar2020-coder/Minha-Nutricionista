@@ -1,0 +1,126 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Stores user physical data and goals",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "height": { "type": "number", "description": "Height in cm" },
+        "weight": { "type": "number", "description": "Weight in kg" },
+        "age": { "type": "number" },
+        "gender": { "type": "string", "enum": ["male", "female", "other"] },
+        "activityLevel": { "type": "string", "enum": ["sedentary", "light", "moderate", "active", "very_active"] },
+        "goal": { "type": "string", "enum": ["lose_weight", "maintain", "gain_muscle"] },
+        "dailyCalorieGoal": { "type": "number" },
+        "restrictions": { "type": "array", "items": { "type": "string" }, "description": "Dietary restrictions like lactose, sugar, etc." },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email"]
+    },
+    "ShoppingList": {
+      "title": "Shopping List",
+      "description": "List of items to buy for the diet",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "items": { 
+          "type": "array", 
+          "items": { 
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "checked": { "type": "boolean" }
+            },
+            "required": ["name", "checked"]
+          } 
+        },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "items"]
+    },
+    "Pantry": {
+      "title": "Pantry",
+      "description": "List of ingredients the user has at home",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "ingredients": { "type": "array", "items": { "type": "string" } },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "ingredients"]
+    },
+    "MealLog": {
+      "title": "Meal Log",
+      "description": "Log of a meal with AI analysis",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "foodName": { "type": "string" },
+        "calories": { "type": "number" },
+        "protein": { "type": "number" },
+        "carbs": { "type": "number" },
+        "fat": { "type": "number" },
+        "analysis": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "calories", "timestamp"]
+    },
+    "DietPlan": {
+      "title": "Diet Plan",
+      "description": "AI generated diet plan",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "dailyCalories": { "type": "number" },
+        "macros": {
+          "type": "object",
+          "properties": {
+            "protein": { "type": "string" },
+            "carbs": { "type": "string" },
+            "fat": { "type": "string" }
+          }
+        },
+        "meals": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "suggestions": { "type": "array", "items": { "type": "string" } },
+              "time": { "type": "string" }
+            }
+          }
+        },
+        "tips": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "dailyCalories", "macros", "meals", "tips", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles"
+    },
+    "/meals/{mealId}": {
+      "schema": "MealLog",
+      "description": "Meal logs"
+    },
+    "/dietPlans/{planId}": {
+      "schema": "DietPlan",
+      "description": "Diet plans"
+    },
+    "/shoppingLists/{listId}": {
+      "schema": "ShoppingList",
+      "description": "User shopping lists"
+    },
+    "/pantry/{pantryId}": {
+      "schema": "Pantry",
+      "description": "User pantry/ingredients"
+    }
+  }
+}
