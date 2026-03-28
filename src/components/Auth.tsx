@@ -112,7 +112,9 @@ export function Auth() {
             className="bg-white p-8 rounded-[2.5rem] shadow-2xl border border-slate-50 space-y-6"
           >
             <div className="space-y-1">
-              <h3 className="text-xl font-black text-slate-900">{isSignUp ? 'Criar Conta' : 'Entrar'}</h3>
+              <h3 className="text-xl font-black text-slate-900" key={isSignUp ? 'signup' : 'login'}>
+                {isSignUp ? 'Criar Conta' : 'Entrar'}
+              </h3>
               <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Acesse sua jornada fitness</p>
             </div>
 
@@ -162,10 +164,10 @@ export function Auth() {
                 {loading ? (
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <>
+                  <div className="flex items-center gap-2">
                     {isSignUp ? <UserPlus className="w-5 h-5" /> : <LogIn className="w-5 h-5" />}
-                    {isSignUp ? 'Criar Conta' : 'Entrar'}
-                  </>
+                    <span>{isSignUp ? 'Criar Conta' : 'Entrar'}</span>
+                  </div>
                 )}
               </button>
             </form>
@@ -175,7 +177,9 @@ export function Auth() {
                 onClick={() => setIsSignUp(!isSignUp)}
                 className="text-xs font-black text-slate-400 hover:text-orange-500 transition-colors uppercase tracking-widest"
               >
-                {isSignUp ? 'Já tem uma conta? Entre' : 'Não tem conta? Crie uma'}
+                <span key={isSignUp ? 'has-account' : 'no-account'}>
+                  {isSignUp ? 'Já tem uma conta? Entre' : 'Não tem conta? Crie uma'}
+                </span>
               </button>
               <button
                 onClick={() => setIsEmailLogin(false)}

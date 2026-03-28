@@ -81,14 +81,38 @@ export function RecipesView({ userProfile }: { userProfile: any }) {
         setLoadingShopping(false);
         return;
       }
+
+      // Sort plans by createdAt, handling potential missing or invalid dates
       const plans = planSnap.docs
-        .map(d => d.data())
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        .map(d => ({ id: d.id, ...d.data() }))
+        .sort((a: any, b: any) => {
+          const getTime = (dateStr: any) => {
+            if (!dateStr) return 0;
+            const t = new Date(dateStr).getTime();
+            return isNaN(t) ? 0 : t;
+          };
+          return getTime(b.createdAt) - getTime(a.createdAt);
+        });
+
       const dietPlan = plans[0] as any;
+      
+      // Check if plan is valid (has meals)
+      if (!dietPlan.meals || !Array.isArray(dietPlan.meals) || dietPlan.meals.length === 0) {
+        console.warn('handleGenerateShoppingList: Diet plan is empty or in old format');
+        setShoppingError('Seu plano de dieta atual está incompleto ou em formato antigo. Por favor, gere um novo plano na aba "Plano" primeiro.');
+        setLoadingShopping(false);
+        return;
+      }
+
       console.log('handleGenerateShoppingList: Diet plan found, generating items with Gemini...');
+      
       const items = await generateShoppingList(dietPlan, userProfile);
       console.log('handleGenerateShoppingList: Gemini returned items:', items);
       
+      if (!items || items.length === 0) {
+        throw new Error('A IA não retornou nenhum item para a lista.');
+      }
+
       const formattedItems = items.map(name => ({ name, checked: false }));
 
       // Save to Firestore using UID as doc ID
@@ -99,10 +123,25 @@ export function RecipesView({ userProfile }: { userProfile: any }) {
         updatedAt: new Date().toISOString()
       });
       console.log('handleGenerateShoppingList: Successfully saved to Firestore');
-    } catch (error) {
+    } catch (error: any) {
       console.error('handleGenerateShoppingList: Error occurred:', error);
-      setShoppingError('Erro ao gerar lista. Tente novamente.');
-      handleFirestoreError(error, OperationType.WRITE, 'shoppingLists');
+      let errorMessage = 'Erro ao gerar lista. Verifique sua conexão e tente novamente.';
+      
+      if (error.message?.includes('quota')) {
+        errorMessage = 'Limite de uso da IA atingido. Tente novamente mais tarde.';
+      } else if (error.message?.includes('segurança')) {
+        errorMessage = error.message;
+      } else if (error.message?.includes('incompleto') || error.message?.includes('formato antigo')) {
+        errorMessage = error.message;
+      } else if (error.message?.includes('IA não retornou')) {
+        errorMessage = error.message;
+      }
+      
+      setShoppingError(errorMessage);
+      // Only call handleFirestoreError if it's actually a Firestore error
+      if (error.code || error.message?.includes('permission-denied')) {
+        handleFirestoreError(error, OperationType.WRITE, 'shoppingLists');
+      }
     } finally {
       setLoadingShopping(false);
     }
@@ -285,8 +324,12 @@ export function RecipesView({ userProfile }: { userProfile: any }) {
                   disabled={loadingShopping}
                   className="bg-slate-900 text-white px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 hover:bg-slate-800 transition-all disabled:opacity-50"
                 >
-                  {loadingShopping ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
-                  Atualizar Lista
+                  {loadingShopping ? (
+                    <Loader2 className="w-4 h-4 animate-spin" key="loader" />
+                  ) : (
+                    <Sparkles className="w-4 h-4" key="icon" />
+                  )}
+                  <span key="text">Atualizar Lista</span>
                 </button>
               </div>
 
@@ -297,47 +340,49 @@ export function RecipesView({ userProfile }: { userProfile: any }) {
                 </div>
               )}
 
-              {shoppingList.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {shoppingList.map((item, i) => (
-                    <button
-                      key={i}
-                      onClick={() => toggleItem(i)}
-                      className={cn(
-                        "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left",
-                        item.checked 
-                          ? "bg-emerald-50 border-emerald-100 opacity-60" 
-                          : "bg-slate-50 border-slate-100 hover:border-orange-200"
-                      )}
-                    >
-                      <div className={cn(
-                        "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
-                        item.checked 
-                          ? "bg-emerald-500 border-emerald-500" 
-                          : "border-slate-200 group-hover:border-orange-500"
-                      )}>
-                        <Check className={cn(
-                          "w-3 h-3 transition-all",
-                          item.checked ? "text-white" : "text-transparent"
-                        )} />
-                      </div>
-                      <span className={cn(
-                        "font-bold transition-all",
-                        item.checked ? "text-emerald-700 line-through" : "text-slate-700"
-                      )}>
-                        {item.name}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <div className="py-20 text-center space-y-4">
-                  <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto">
-                    <ShoppingCart className="w-10 h-10 text-slate-200" />
+              <div key="shopping-list-container">
+                {shoppingList.length > 0 ? (
+                  <div key="list-grid" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {shoppingList.map((item, i) => (
+                      <button
+                        key={`item-${i}-${item.name}`}
+                        onClick={() => toggleItem(i)}
+                        className={cn(
+                          "flex items-center gap-4 p-4 rounded-2xl border transition-all text-left",
+                          item.checked 
+                            ? "bg-emerald-50 border-emerald-100 opacity-60" 
+                            : "bg-slate-50 border-slate-100 hover:border-orange-200"
+                        )}
+                      >
+                        <div className={cn(
+                          "w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all shrink-0",
+                          item.checked 
+                            ? "bg-emerald-500 border-emerald-500" 
+                            : "border-slate-200 group-hover:border-orange-500"
+                        )}>
+                          <Check className={cn(
+                            "w-3 h-3 transition-all",
+                            item.checked ? "text-white" : "text-transparent"
+                          )} />
+                        </div>
+                        <span className={cn(
+                          "font-bold transition-all",
+                          item.checked ? "text-emerald-700 line-through" : "text-slate-700"
+                        )}>
+                          {item.name}
+                        </span>
+                      </button>
+                    ))}
                   </div>
-                  <p className="text-slate-400 font-medium">Sua lista está vazia. Clique em atualizar para gerar uma.</p>
-                </div>
-              )}
+                ) : (
+                  <div key="empty-list" className="py-20 text-center space-y-4">
+                    <div className="w-20 h-20 bg-slate-50 rounded-[2rem] flex items-center justify-center mx-auto">
+                      <ShoppingCart className="w-10 h-10 text-slate-200" />
+                    </div>
+                    <p className="text-slate-400 font-medium">Sua lista está vazia. Clique em atualizar para gerar uma.</p>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
@@ -393,8 +438,12 @@ export function RecipesView({ userProfile }: { userProfile: any }) {
                   disabled={loadingIdeas}
                   className="w-full bg-orange-500 text-white py-5 rounded-[2rem] font-black text-lg shadow-2xl shadow-orange-200 flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50"
                 >
-                  {loadingIdeas ? <Loader2 className="w-6 h-6 animate-spin" /> : <Sparkles className="w-6 h-6" />}
-                  O que posso cozinhar?
+                  {loadingIdeas ? (
+                    <Loader2 className="w-6 h-6 animate-spin" key="loader" />
+                  ) : (
+                    <Sparkles className="w-6 h-6" key="icon" />
+                  )}
+                  <span key="text">O que posso cozinhar?</span>
                 </button>
               )}
             </div>
@@ -427,7 +476,11 @@ export function RecipesView({ userProfile }: { userProfile: any }) {
                     <p className="text-sm text-slate-500 font-medium">Gere receitas com o que você já tem em casa.</p>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-black text-orange-500 uppercase tracking-widest">
-                    {loadingIdeas ? <Loader2 className="w-4 h-4 animate-spin" /> : "Gerar Agora"}
+                    {loadingIdeas ? (
+                      <Loader2 className="w-4 h-4 animate-spin" key="loader" />
+                    ) : (
+                      <span key="text">Gerar Agora</span>
+                    )}
                   </div>
                 </div>
               </button>
@@ -449,7 +502,11 @@ export function RecipesView({ userProfile }: { userProfile: any }) {
                     <p className="text-sm text-slate-500 font-medium">Receitas ideais para seguir sua dieta rigorosa.</p>
                   </div>
                   <div className="flex items-center gap-2 text-xs font-black text-emerald-600 uppercase tracking-widest">
-                    {loadingSuggestions ? <Loader2 className="w-4 h-4 animate-spin" /> : "Ver Sugestões"}
+                    {loadingSuggestions ? (
+                      <Loader2 className="w-4 h-4 animate-spin" key="loader" />
+                    ) : (
+                      <span key="text">Ver Sugestões</span>
+                    )}
                   </div>
                 </div>
               </button>

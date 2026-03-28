@@ -239,38 +239,62 @@ export async function getDailyFeedback(meals: any[], userProfile: any): Promise<
 
 export async function generateShoppingList(dietPlan: DietPlan, userProfile: any): Promise<string[]> {
   const model = "gemini-3-flash-preview";
-  const prompt = `Com base neste plano de dieta completo e nas restrições do usuário, gere uma lista de compras otimizada.
   
-  IMPORTANTE: Considere TODAS as refeições do plano:
-  - Café da Manhã
-  - Lanche da Manhã
-  - Almoço
-  - Lanche da Tarde
-  - Jantar
-  - Ceia
+  // Sanitize dietPlan to only include necessary info for shopping list
+  // Ensure meals and tips are arrays to avoid stringify issues
+  const sanitizedPlan = {
+    meals: (dietPlan.meals || []).map(m => ({ 
+      name: m.name || 'Refeição', 
+      suggestions: Array.isArray(m.suggestions) ? m.suggestions : [] 
+    })),
+    tips: Array.isArray(dietPlan.tips) ? dietPlan.tips : []
+  };
+
+  const restrictions = Array.isArray(userProfile.restrictions) 
+    ? userProfile.restrictions.join(', ') 
+    : 'Nenhuma';
+
+  const prompt = `Com base neste plano de dieta e nas restrições do usuário, gere uma lista de compras otimizada e completa.
   
-  Plano: ${JSON.stringify(dietPlan)}
-  Restrições: ${userProfile.restrictions?.join(', ') || 'Nenhuma'}
+  Plano: ${JSON.stringify(sanitizedPlan)}
+  Restrições: ${restrictions}
   
   Retorne APENAS um JSON com um array de strings chamado "items".`;
 
-  const response = await ai.models.generateContent({
-    model,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          items: { type: Type.ARRAY, items: { type: Type.STRING } },
-        },
-        required: ["items"],
-      },
-    },
-  });
+  console.log("generateShoppingList: Calling Gemini with prompt length:", prompt.length);
 
-  const data = JSON.parse(response.text || "{}");
-  return data.items || [];
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            items: { type: Type.ARRAY, items: { type: Type.STRING } },
+          },
+          required: ["items"],
+        },
+      },
+    });
+
+    if (!response.text) {
+      console.error("generateShoppingList: Gemini returned empty response");
+      return [];
+    }
+
+    console.log("generateShoppingList: Gemini response received");
+    const data = JSON.parse(response.text);
+    return Array.isArray(data.items) ? data.items : [];
+  } catch (error: any) {
+    console.error("generateShoppingList: Error calling Gemini:", error);
+    // Re-throw with a more descriptive message if possible
+    if (error.message?.includes('SAFETY')) {
+      throw new Error('A IA não pôde gerar a lista devido a filtros de segurança. Tente ajustar seu plano.');
+    }
+    throw error;
+  }
 }
 
 export interface RecipeIdea {
