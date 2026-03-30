@@ -1,14 +1,26 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import Groq from "groq-sdk";
 
 const getApiKey = () => {
-  const key = process.env.GEMINI_API_KEY;
+  const key = process.env.GROQ_API_KEY;
   if (!key) {
-    console.warn("GEMINI_API_KEY is not defined in the environment.");
+    console.error("GROQ_API_KEY is not defined in the environment. AI features will fail.");
+  } else {
+    const maskedKey = key.length > 8 
+      ? `${key.substring(0, 4)}...${key.substring(key.length - 4)}`
+      : '***';
+    console.log(`GROQ_API_KEY is present (length: ${key.length}, format: ${maskedKey})`);
   }
   return key || "";
 };
 
-const ai = new GoogleGenAI({ apiKey: getApiKey() });
+const getAi = () => {
+  const apiKey = getApiKey();
+  if (!apiKey) {
+    throw new Error("Chave da API Groq não configurada. Por favor, configure GROQ_API_KEY no menu Settings.");
+  }
+  // dangerouslyAllowBrowser: true é necessário para usar o SDK da Groq diretamente no frontend (React)
+  return new Groq({ apiKey, dangerouslyAllowBrowser: true });
+};
 
 export interface FoodAnalysisResult {
   foodName: string;
@@ -20,10 +32,9 @@ export interface FoodAnalysisResult {
 }
 
 export async function analyzeFoodImage(base64Image: string, userContext?: any): Promise<FoodAnalysisResult> {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Chave da API Gemini não configurada. Por favor, configure GEMINI_API_KEY.");
-  
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  // Usando o modelo de visão da Groq (Llama 4 Scout)
+  const model = "meta-llama/llama-4-scout-17b-16e-instruct";
   
   const contextPrompt = userContext ? `
     Contexto do Usuário:
@@ -33,62 +44,42 @@ export async function analyzeFoodImage(base64Image: string, userContext?: any): 
     - Restrições Alimentares: ${userContext.restrictions?.join(', ') || 'Nenhuma'}
   ` : "";
 
+  const imageUrl = base64Image.startsWith('data:') ? base64Image : `data:image/jpeg;base64,${base64Image}`;
+
   try {
-    const response = await ai.models.generateContent({
+    const response = await groq.chat.completions.create({
       model,
-      contents: [
+      messages: [
         {
-          parts: [
-            {
-              inlineData: {
-                mimeType: "image/jpeg",
-                data: base64Image.split(',')[1] || base64Image,
-              },
-            },
-            {
-              text: `Analise esta imagem de comida. Forneça o nome do alimento, calorias estimadas, proteína (g), carboidratos (g) e gordura (g). 
-              ${contextPrompt}
-              
-              Sua análise deve ser a de uma Nutricionista Rigorosa e Altamente Profissional. 
-              Seja direta, firme e disciplinada. 
-              Se o alimento for saudável e ajudar no objetivo do usuário, elogie a disciplina. 
-              Se for prejudicial (açúcar, fritura, ultraprocessados, excesso de calorias para o objetivo), dê um "puxão de orelha" severo e explique o porquê.
-              Não use rodeios. Retorne APENAS JSON em português.`,
-            },
-          ],
+          role: "system",
+          content: "Você é uma Nutricionista Rigorosa. Sua voz é firme, disciplinada e sem rodeios. Você não tolera desculpas e foca 100% na saúde e nos objetivos do seu paciente. Retorne APENAS um JSON válido com as chaves: foodName (string), calories (number), protein (number), carbs (number), fat (number), analysis (string)."
         },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: `Analise esta imagem de comida. Forneça o nome do alimento, calorias estimadas, proteína (g), carboidratos (g) e gordura (g). \n${contextPrompt}\nSeja direta e firme. Se for saudável, elogie. Se for prejudicial, dê um puxão de orelha severo.` },
+            { type: "image_url", image_url: { url: imageUrl } }
+          ]
+        }
       ],
-      config: {
-        systemInstruction: "Você é uma Nutricionista Rigorosa. Sua voz é firme, disciplinada e sem rodeios. Você não tolera desculpas e foca 100% na saúde e nos objetivos do seu paciente.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            foodName: { type: Type.STRING, description: "Nome do alimento em português" },
-            calories: { type: Type.NUMBER },
-            protein: { type: Type.NUMBER },
-            carbs: { type: Type.NUMBER },
-            fat: { type: Type.NUMBER },
-            analysis: { type: Type.STRING, description: "Análise rigorosa da nutricionista em português" },
-          },
-          required: ["foodName", "calories", "protein", "carbs", "fat", "analysis"],
-        },
-      },
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 1024,
     });
 
-    if (!response.text) throw new Error("A IA não retornou uma resposta válida.");
-    return JSON.parse(response.text) as FoodAnalysisResult;
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("A IA não retornou uma resposta válida.");
+    return JSON.parse(content) as FoodAnalysisResult;
   } catch (error: any) {
-    console.error("Erro na análise do Gemini:", error);
+    console.error("Erro na análise do Groq:", error);
     throw new Error(error.message || "Erro desconhecido na análise da imagem.");
   }
 }
 
 export async function analyzeFoodText(foodDescription: string, userContext?: any): Promise<FoodAnalysisResult> {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Chave da API Gemini não configurada. Por favor, configure GEMINI_API_KEY.");
-
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  // Usando o modelo mais inteligente de texto da Groq
+  const model = "llama-3.3-70b-versatile";
   
   const contextPrompt = userContext ? `
     Contexto do Usuário:
@@ -99,38 +90,28 @@ export async function analyzeFoodText(foodDescription: string, userContext?: any
   ` : "";
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await groq.chat.completions.create({
       model,
-      contents: `O usuário descreveu o que comeu: "${foodDescription}". Forneça o nome do alimento, calorias estimadas, proteína (g), carboidratos (g) e gordura (g). 
-      ${contextPrompt}
-      
-      Sua análise deve ser a de uma Nutricionista Rigorosa e Altamente Profissional. 
-      Seja direta, firme e disciplinada. 
-      Se o alimento for saudável e ajudar no objetivo do usuário, elogie a disciplina. 
-      Se for prejudicial, dê um "puxão de orelha" severo.
-      Retorne APENAS JSON em português.`,
-      config: {
-        systemInstruction: "Você é uma Nutricionista Rigorosa. Sua voz é firme, disciplinada e sem rodeios. Você não tolera desculpas e foca 100% na saúde e nos objetivos do seu paciente.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            foodName: { type: Type.STRING, description: "Nome do alimento em português" },
-            calories: { type: Type.NUMBER },
-            protein: { type: Type.NUMBER },
-            carbs: { type: Type.NUMBER },
-            fat: { type: Type.NUMBER },
-            analysis: { type: Type.STRING, description: "Análise rigorosa da nutricionista em português" },
-          },
-          required: ["foodName", "calories", "protein", "carbs", "fat", "analysis"],
+      messages: [
+        {
+          role: "system",
+          content: "Você é uma Nutricionista Rigorosa. Sua voz é firme, disciplinada e sem rodeios. Você não tolera desculpas e foca 100% na saúde e nos objetivos do seu paciente. Retorne APENAS um JSON válido com as chaves: foodName (string), calories (number), protein (number), carbs (number), fat (number), analysis (string)."
         },
-      },
+        {
+          role: "user",
+          content: `O usuário descreveu o que comeu: "${foodDescription}". Forneça o nome do alimento, calorias estimadas, proteína (g), carboidratos (g) e gordura (g). \n${contextPrompt}\nSeja direta e firme. Se for saudável, elogie. Se for prejudicial, dê um puxão de orelha severo.`
+        }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
+      max_tokens: 1024,
     });
 
-    if (!response.text) throw new Error("A IA não retornou uma resposta válida.");
-    return JSON.parse(response.text) as FoodAnalysisResult;
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("A IA não retornou uma resposta válida.");
+    return JSON.parse(content) as FoodAnalysisResult;
   } catch (error: any) {
-    console.error("Erro na análise de texto do Gemini:", error);
+    console.error("Erro na análise de texto do Groq:", error);
     throw new Error(error.message || "Erro desconhecido na análise do texto.");
   }
 }
@@ -151,10 +132,8 @@ export interface DietPlan {
 }
 
 export async function generateDietPlan(userData: any): Promise<DietPlan> {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Chave da API Gemini não configurada. Por favor, configure GEMINI_API_KEY.");
-
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  const model = "llama-3.3-70b-versatile";
   
   const prompt = `Com base nos seguintes dados do usuário, gere um plano de dieta saudável estruturado.
   Altura: ${userData.height}cm
@@ -168,66 +147,42 @@ export async function generateDietPlan(userData: any): Promise<DietPlan> {
   
   Sua voz deve ser a de uma Nutricionista Rigorosa. O plano deve ser eficiente e sem concessões para alimentos vazios.
   
-  Retorne APENAS um JSON em português com a seguinte estrutura:
+  Retorne APENAS um JSON válido em português com a seguinte estrutura exata:
   {
     "dailyCalories": number,
     "macros": { "protein": "string", "carbs": "string", "fat": "string" },
     "meals": [
-      { "name": "Café da Manhã", "suggestions": ["opção 1", "opção 2"], "time": "08:00" },
-      ... (inclua Almoço, Jantar e Lanches)
+      { "name": "Café da Manhã", "suggestions": ["opção 1", "opção 2"], "time": "08:00" }
     ],
     "tips": ["dica 1", "dica 2"]
   }`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await groq.chat.completions.create({
       model,
-      contents: prompt,
-      config: {
-        systemInstruction: "Você é uma Nutricionista Rigorosa. Você cria planos de dieta focados em resultados reais e disciplina absoluta.",
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            dailyCalories: { type: Type.NUMBER },
-            macros: {
-              type: Type.OBJECT,
-              properties: {
-                protein: { type: Type.STRING },
-                carbs: { type: Type.STRING },
-                fat: { type: Type.STRING },
-              },
-              required: ["protein", "carbs", "fat"],
-            },
-            meals: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  name: { type: Type.STRING },
-                  suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
-                  time: { type: Type.STRING },
-                },
-                required: ["name", "suggestions", "time"],
-              },
-            },
-            tips: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: ["dailyCalories", "macros", "meals", "tips"],
+      messages: [
+        {
+          role: "system",
+          content: "Você é uma Nutricionista Rigorosa. Você cria planos de dieta focados em resultados reais e disciplina absoluta. Retorne APENAS JSON válido."
         },
-      },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.2,
     });
 
-    if (!response.text) throw new Error("A IA não retornou uma resposta válida para o plano de dieta.");
-    return JSON.parse(response.text) as DietPlan;
+    const content = response.choices[0]?.message?.content;
+    if (!content) throw new Error("A IA não retornou uma resposta válida para o plano de dieta.");
+    return JSON.parse(content) as DietPlan;
   } catch (error: any) {
-    console.error("Erro na geração do plano de dieta do Gemini:", error);
+    console.error("Erro na geração do plano de dieta do Groq:", error);
     throw new Error(error.message || "Erro ao gerar o plano de dieta.");
   }
 }
 
 export async function getDailyFeedback(meals: any[], userProfile: any): Promise<string> {
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  const model = "llama-3.3-70b-versatile";
   
   const mealsSummary = meals.map(m => `- ${m.foodName}: ${m.calories}kcal, P:${m.protein}g, C:${m.carbs}g, G:${m.fat}g`).join('\n');
   const totalCalories = meals.reduce((acc, m) => acc + m.calories, 0);
@@ -249,22 +204,22 @@ export async function getDailyFeedback(meals: any[], userProfile: any): Promise<
     Foque nos resultados e na saúde.
   `;
 
-  const response = await ai.models.generateContent({
+  const response = await groq.chat.completions.create({
     model,
-    contents: prompt,
-    config: {
-      systemInstruction: "Você é uma Nutricionista Rigorosa. Você não aceita desculpas e quer ver resultados.",
-    },
+    messages: [
+      { role: "system", content: "Você é uma Nutricionista Rigorosa. Você não aceita desculpas e quer ver resultados." },
+      { role: "user", content: prompt }
+    ],
+    temperature: 0.4,
   });
 
-  return response.text || "Sem feedback por enquanto. Continue registrando.";
+  return response.choices[0]?.message?.content || "Sem feedback por enquanto. Continue registrando.";
 }
 
 export async function generateShoppingList(dietPlan: DietPlan, userProfile: any): Promise<string[]> {
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  const model = "llama-3.3-70b-versatile";
   
-  // Sanitize dietPlan to only include necessary info for shopping list
-  // Ensure meals and tips are arrays to avoid stringify issues
   const sanitizedPlan = {
     meals: (dietPlan.meals || []).map(m => ({ 
       name: m.name || 'Refeição', 
@@ -282,40 +237,25 @@ export async function generateShoppingList(dietPlan: DietPlan, userProfile: any)
   Plano: ${JSON.stringify(sanitizedPlan)}
   Restrições: ${restrictions}
   
-  Retorne APENAS um JSON com um array de strings chamado "items".`;
-
-  console.log("generateShoppingList: Calling Gemini with prompt length:", prompt.length);
+  Retorne APENAS um JSON válido com um array de strings chamado "items". Exemplo: {"items": ["Ovo", "Frango"]}`;
 
   try {
-    const response = await ai.models.generateContent({
+    const response = await groq.chat.completions.create({
       model,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            items: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: ["items"],
-        },
-      },
+      messages: [
+        { role: "system", content: "Você é um assistente que gera listas de compras. Retorne APENAS JSON válido." },
+        { role: "user", content: prompt }
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.1,
     });
 
-    if (!response.text) {
-      console.error("generateShoppingList: Gemini returned empty response");
-      return [];
-    }
-
-    console.log("generateShoppingList: Gemini response received");
-    const data = JSON.parse(response.text);
+    const content = response.choices[0]?.message?.content;
+    if (!content) return [];
+    const data = JSON.parse(content);
     return Array.isArray(data.items) ? data.items : [];
   } catch (error: any) {
-    console.error("generateShoppingList: Error calling Gemini:", error);
-    // Re-throw with a more descriptive message if possible
-    if (error.message?.includes('SAFETY')) {
-      throw new Error('A IA não pôde gerar a lista devido a filtros de segurança. Tente ajustar seu plano.');
-    }
+    console.error("generateShoppingList: Error calling Groq:", error);
     throw error;
   }
 }
@@ -329,7 +269,8 @@ export interface RecipeIdea {
 }
 
 export async function generateRecipeIdeas(ingredients: string[], userProfile: any): Promise<RecipeIdea[]> {
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  const model = "llama-3.3-70b-versatile";
   const prompt = `O usuário tem os seguintes ingredientes em casa: ${ingredients.join(', ')}.
   Objetivo: ${userProfile.goal}
   Restrições: ${userProfile.restrictions?.join(', ') || 'Nenhuma'}
@@ -337,38 +278,22 @@ export async function generateRecipeIdeas(ingredients: string[], userProfile: an
   Sugira 15 ideias de receitas saudáveis e variadas que ele pode fazer com esses ingredientes. 
   Tente cobrir diferentes categorias (Café da Manhã, Almoço, Sobremesa, Café da Tarde ou Jantar).
   Forneça pelo menos 3 opções para cada categoria de refeição.
-  Considere a condição financeira implícita nos ingredientes (se forem simples, sugira algo prático e barato).
-  Retorne APENAS um JSON com um array de objetos chamado "ideas".`;
+  Considere a condição financeira implícita nos ingredientes.
+  Retorne APENAS um JSON válido com um array de objetos chamado "ideas".
+  Cada objeto deve ter: name (string), description (string), difficulty ("fácil", "médio" ou "difícil"), time (string), mealType (string).`;
 
-  const response = await ai.models.generateContent({
+  const response = await groq.chat.completions.create({
     model,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          ideas: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                difficulty: { type: Type.STRING, enum: ['fácil', 'médio', 'difícil'] },
-                time: { type: Type.STRING },
-                mealType: { type: Type.STRING, description: "Tipo de refeição (DEVE SER EXATAMENTE: Café da Manhã, Almoço, Sobremesa, Café da Tarde ou Jantar)" },
-              },
-              required: ["name", "description", "difficulty", "time", "mealType"],
-            },
-          },
-        },
-        required: ["ideas"],
-      },
-    },
+    messages: [
+      { role: "system", content: "Você é um chef nutricionista. Retorne APENAS JSON válido." },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
   });
 
-  const data = JSON.parse(response.text || "{}");
+  const content = response.choices[0]?.message?.content;
+  const data = JSON.parse(content || "{}");
   return data.ideas || [];
 }
 
@@ -381,45 +306,38 @@ export interface FullRecipe {
 }
 
 export async function getRecipeDetails(recipeName: string, availableIngredients: string[], userProfile: any): Promise<FullRecipe> {
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  const model = "llama-3.3-70b-versatile";
   const prompt = `Forneça a receita completa para "${recipeName}".
   Ingredientes disponíveis: ${availableIngredients.join(', ')}.
   Restrições do usuário: ${userProfile.restrictions?.join(', ') || 'Nenhuma'}
   
-  Retorne APENAS um JSON com a estrutura da receita.`;
+  Retorne APENAS um JSON válido com a estrutura:
+  {
+    "name": "string",
+    "ingredients": ["string"],
+    "instructions": ["string"],
+    "calories": number,
+    "macros": { "protein": number, "carbs": number, "fat": number }
+  }`;
 
-  const response = await ai.models.generateContent({
+  const response = await groq.chat.completions.create({
     model,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          name: { type: Type.STRING },
-          ingredients: { type: Type.ARRAY, items: { type: Type.STRING } },
-          instructions: { type: Type.ARRAY, items: { type: Type.STRING } },
-          calories: { type: Type.NUMBER },
-          macros: {
-            type: Type.OBJECT,
-            properties: {
-              protein: { type: Type.NUMBER },
-              carbs: { type: Type.NUMBER },
-              fat: { type: Type.NUMBER },
-            },
-            required: ["protein", "carbs", "fat"],
-          },
-        },
-        required: ["name", "ingredients", "instructions", "calories", "macros"],
-      },
-    },
+    messages: [
+      { role: "system", content: "Você é um chef nutricionista. Retorne APENAS JSON válido." },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.2,
   });
 
-  return JSON.parse(response.text || "{}") as FullRecipe;
+  const content = response.choices[0]?.message?.content;
+  return JSON.parse(content || "{}") as FullRecipe;
 }
 
 export async function generateGeneralRecipeSuggestions(dietPlan: DietPlan, userProfile: any): Promise<RecipeIdea[]> {
-  const model = "gemini-3-flash-preview";
+  const groq = getAi();
+  const model = "llama-3.3-70b-versatile";
   const prompt = `Com base neste plano de dieta e nas restrições do usuário, sugira 30 receitas saudáveis e variadas (6 para cada categoria abaixo).
   
   CATEGORIAS OBRIGATÓRIAS (mealType):
@@ -429,41 +347,23 @@ export async function generateGeneralRecipeSuggestions(dietPlan: DietPlan, userP
   - Café da Tarde
   - Jantar
   
-  Para cada categoria, forneça múltiplas opções para que o usuário possa escolher a que mais lhe agrada no momento.
-  
   Plano: ${JSON.stringify(dietPlan)}
   Restrições: ${userProfile.restrictions?.join(', ') || 'Nenhuma'}
   
-  Retorne APENAS um JSON com um array de objetos chamado "ideas".`;
+  Retorne APENAS um JSON válido com um array de objetos chamado "ideas".
+  Cada objeto deve ter: name (string), description (string), difficulty ("fácil", "médio" ou "difícil"), time (string), mealType (string).`;
 
-  const response = await ai.models.generateContent({
+  const response = await groq.chat.completions.create({
     model,
-    contents: prompt,
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: {
-        type: Type.OBJECT,
-        properties: {
-          ideas: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                name: { type: Type.STRING },
-                description: { type: Type.STRING },
-                difficulty: { type: Type.STRING, enum: ['fácil', 'médio', 'difícil'] },
-                time: { type: Type.STRING },
-                mealType: { type: Type.STRING, description: "Tipo de refeição (DEVE SER EXATAMENTE: Café da Manhã, Almoço, Sobremesa, Café da Tarde ou Jantar)" },
-              },
-              required: ["name", "description", "difficulty", "time", "mealType"],
-            },
-          },
-        },
-        required: ["ideas"],
-      },
-    },
+    messages: [
+      { role: "system", content: "Você é um chef nutricionista. Retorne APENAS JSON válido." },
+      { role: "user", content: prompt }
+    ],
+    response_format: { type: "json_object" },
+    temperature: 0.3,
   });
 
-  const data = JSON.parse(response.text || "{}");
+  const content = response.choices[0]?.message?.content;
+  const data = JSON.parse(content || "{}");
   return data.ideas || [];
 }

@@ -30,6 +30,7 @@ function AppContent() {
 
   useEffect(() => {
     console.log('App: Setting up auth listener');
+    console.log('App: GROQ_API_KEY status:', process.env.GROQ_API_KEY ? 'Present' : 'Missing');
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       console.log('App: Auth state changed:', u ? `User logged in: ${u.uid}` : 'No user');
       setUser(u);
@@ -152,13 +153,13 @@ function AppContent() {
             </AnimatePresence>
           </main>
 
-          <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-sm bg-slate-900/90 backdrop-blur-2xl border border-white/10 px-6 py-3 z-50 rounded-[2rem] shadow-2xl shadow-slate-900/20">
-            <div className="flex justify-between items-center">
+          <nav className="fixed bottom-0 left-0 right-0 w-full bg-white border-t border-slate-200 px-2 sm:px-6 py-2 z-40 pb-safe shadow-[0_-10px_40px_rgba(0,0,0,0.05)]">
+            <div className="max-w-md mx-auto flex justify-between items-center">
               <NavButton 
                 active={activeTab === 'dashboard'} 
                 onClick={() => setActiveTab('dashboard')} 
                 icon={<PieChart className="w-5 h-5" />} 
-                label="Início" 
+                label="Resumo" 
               />
               <NavButton 
                 active={activeTab === 'analyze'} 
@@ -208,23 +209,17 @@ function NavButton({ active, onClick, icon, label }: any) {
     <button
       onClick={onClick}
       className={cn(
-        "flex flex-col items-center gap-1 transition-all relative",
-        active ? "text-orange-500 scale-105" : "text-slate-400 hover:text-slate-200"
+        "flex flex-col items-center gap-1 p-2 min-w-[64px] transition-all relative",
+        active ? "text-orange-600" : "text-slate-400 hover:text-slate-900"
       )}
     >
       <div className={cn(
-        "p-2 rounded-xl transition-all duration-300",
-        active ? "bg-orange-500/10 shadow-[0_0_15px_rgba(249,115,22,0.1)]" : "bg-transparent"
+        "p-1.5 rounded-xl transition-all duration-300",
+        active ? "bg-orange-100" : "bg-transparent"
       )}>
         {icon}
       </div>
-      <span className="text-[8px] font-black uppercase tracking-widest">{label}</span>
-      {active && (
-        <motion.div 
-          layoutId="nav-dot"
-          className="absolute -bottom-1 w-1 h-1 bg-orange-500 rounded-full"
-        />
-      )}
+      <span className="text-[9px] font-black uppercase tracking-widest"><span>{label}</span></span>
     </button>
   );
 }

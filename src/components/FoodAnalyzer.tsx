@@ -262,7 +262,7 @@ export function FoodAnalyzer({ userProfile, onAnalysisComplete }: { userProfile:
                 ) : (
                   <>
                     <Sparkles className="w-6 h-6 text-orange-400" />
-                    Analisar Texto
+                    <span>Analisar Texto</span>
                   </>
                 )}
               </motion.button>
@@ -292,7 +292,7 @@ export function FoodAnalyzer({ userProfile, onAnalysisComplete }: { userProfile:
               className="w-full py-5 bg-slate-900 text-white font-black text-lg rounded-[2rem] hover:bg-slate-800 transition-all shadow-2xl shadow-slate-200 flex items-center justify-center gap-3"
             >
               <Sparkles className="w-6 h-6 text-orange-400" />
-              Analisar Agora
+              <span>Analisar Agora</span>
             </button>
           )}
 

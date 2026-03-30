@@ -18,9 +18,11 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 
 export function DietPlanView({ userProfile }: { userProfile: any }) {
+  console.log('DietPlanView: Rendering with profile:', !!userProfile);
   const [plans, setPlans] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -55,6 +57,7 @@ export function DietPlanView({ userProfile }: { userProfile: any }) {
     }
     
     setGenerating(true);
+    setError(null);
     console.log('DietPlanView: Generating plan for profile:', JSON.stringify(userProfile));
 
     try {
@@ -67,13 +70,14 @@ export function DietPlanView({ userProfile }: { userProfile: any }) {
         createdAt: new Date().toISOString(),
       });
       console.log('DietPlanView: Plan saved to Firestore');
-    } catch (error: any) {
-      console.error('DietPlanView: Error generating or saving plan:', error);
+    } catch (err: any) {
+      console.error('DietPlanView: Error generating or saving plan:', err);
       // If it's a Gemini error, it might not be a Firestore error
-      if (error.message && (error.message.includes('quota') || error.message.includes('SAFETY') || error.message.includes('IA'))) {
-        alert(`Erro da IA: ${error.message}`);
+      if (err.message && (err.message.includes('quota') || err.message.includes('SAFETY') || err.message.includes('IA'))) {
+        setError(`Erro da IA: ${err.message}`);
       } else {
-        handleFirestoreError(error, OperationType.WRITE, 'dietPlans');
+        setError(`Erro ao salvar plano: ${err.message}`);
+        handleFirestoreError(err, OperationType.WRITE, 'dietPlans');
       }
     } finally {
       setGenerating(false);
@@ -101,19 +105,41 @@ export function DietPlanView({ userProfile }: { userProfile: any }) {
           <p className="text-slate-500 font-medium">Estratégia nutricional personalizada para seu objetivo.</p>
         </div>
         
-        <button
-          id="generate-plan-header-btn"
-          onClick={handleGeneratePlan}
-          disabled={generating}
-          className="relative group overflow-hidden px-8 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-slate-200"
-        >
-          {generating ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <Sparkles className="w-5 h-5 text-orange-400 group-hover:scale-125 transition-transform" />
+        <div className="flex flex-col items-end gap-2">
+          <button
+            id="generate-plan-header-btn"
+            onClick={handleGeneratePlan}
+            disabled={generating}
+            className="relative group overflow-hidden px-8 py-4 bg-slate-900 text-white font-bold rounded-2xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-xl shadow-slate-200"
+          >
+            {generating ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <Sparkles className="w-5 h-5 text-orange-400 group-hover:scale-125 transition-transform" />
+            )}
+            <span>{latestPlan ? 'Novo Plano' : 'Criar Meu Plano'}</span>
+          </button>
+          
+          {error && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex flex-col gap-2 text-red-500 text-xs font-bold bg-red-50 p-4 rounded-2xl border border-red-100 max-w-xs shadow-lg"
+            >
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="w-4 h-4 shrink-0" />
+                <span>Erro na Estratégia</span>
+              </div>
+              <p className="font-medium text-[10px] leading-tight opacity-80">{error}</p>
+              <button 
+                onClick={() => setError(null)}
+                className="mt-1 text-[9px] uppercase tracking-widest bg-red-100 px-2 py-1 rounded-lg hover:bg-red-200 transition-colors w-fit"
+              >
+                Limpar
+              </button>
+            </motion.div>
           )}
-          <span>{latestPlan ? 'Atualizar Estratégia' : 'Criar Meu Plano'}</span>
-        </button>
+        </div>
       </header>
 
       {loading ? (
@@ -240,6 +266,13 @@ export function DietPlanView({ userProfile }: { userProfile: any }) {
           </div>
         </div>
       )}
+      
+      {/* Footer with debug info */}
+      <footer className="pt-12 pb-6 text-center">
+        <p className="text-[8px] font-black text-slate-300 uppercase tracking-[0.2em] opacity-50">
+          NutriTrack AI v1.0 • {process.env.GROQ_API_KEY ? 'IA Ativa' : 'IA Offline'}
+        </p>
+      </footer>
     </div>
   );
 }

@@ -69,6 +69,17 @@
       },
       "required": ["uid", "calories", "timestamp"]
     },
+    "WaterLog": {
+      "title": "Water Log",
+      "description": "Log of water consumption",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "amount": { "type": "number", "description": "Amount of water in ml" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "amount", "timestamp"]
+    },
     "DietPlan": {
       "title": "Diet Plan",
       "description": "AI generated diet plan",
@@ -121,6 +132,10 @@
     "/pantry/{pantryId}": {
       "schema": "Pantry",
       "description": "User pantry/ingredients"
+    },
+    "/waterLogs/{logId}": {
+      "schema": "WaterLog",
+      "description": "Water consumption logs"
     }
   }
 }

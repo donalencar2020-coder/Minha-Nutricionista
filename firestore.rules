@@ -53,6 +53,12 @@ service cloud.firestore {
     //   - ingredients: list
     //   - updatedAt: string (ISO date)
     //
+    // Collection: waterLogs
+    // Fields:
+    //   - uid: string (required)
+    //   - amount: number (required)
+    //   - timestamp: string (ISO date) (required)
+    //
     // ===============================================================
 
     // ===============================================================
@@ -108,6 +114,13 @@ service cloud.firestore {
              isValidDateString(data.createdAt);
     }
 
+    function isValidWaterLog(data) {
+      return data.keys().hasAll(['uid', 'amount', 'timestamp']) &&
+             data.uid == request.auth.uid &&
+             data.amount is number &&
+             isValidDateString(data.timestamp);
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -144,6 +157,13 @@ service cloud.firestore {
       allow create: if isOwner(pantryId) && isRequestOwner() && request.resource.data.ingredients is list;
       allow update: if isOwner(pantryId) && isRequestOwner() && request.resource.data.ingredients is list;
       allow delete: if isOwner(pantryId);
+    }
+
+    match /waterLogs/{logId} {
+      allow read: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid);
+      allow create: if isRequestOwner() && isValidWaterLog(request.resource.data);
+      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && isRequestOwner() && isValidWaterLog(request.resource.data);
+      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
     }
 
     match /{path=**} {

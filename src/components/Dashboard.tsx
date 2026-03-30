@@ -1,29 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { db, auth, OperationType, handleFirestoreError } from '../lib/firebase';
-import { collection, query, where, orderBy, onSnapshot } from 'firebase/firestore';
-import { format, isToday } from 'date-fns';
+import { collection, query, where, orderBy, onSnapshot, doc, deleteDoc, updateDoc, addDoc } from 'firebase/firestore';
+import { format, isToday, subDays, startOfDay } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { Flame, Utensils, TrendingUp, Calendar, ArrowRight, Target, Zap, Loader2 as LoaderIcon, MessageSquareQuote, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { Flame, Utensils, TrendingUp, Calendar, ArrowRight, Target, Zap, Loader2 as LoaderIcon, MessageSquareQuote, ShieldAlert, CheckCircle2, Trash2, Edit2, Save, X, Droplets, Plus, Minus } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { getDailyFeedback } from '../services/gemini';
 import { cn } from '../lib/utils';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 export function Dashboard({ userProfile }: { userProfile: any }) {
   const [meals, setMeals] = useState<any[]>([]);
+  const [waterLogs, setWaterLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedMeal, setSelectedMeal] = useState<any>(null);
   const [dailyFeedback, setDailyFeedback] = useState<string | null>(null);
   const [loadingFeedback, setLoadingFeedback] = useState(false);
+  const [isEditingMeal, setIsEditingMeal] = useState(false);
+  const [editFormData, setEditFormData] = useState<any>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
 
-    const q = query(
+    const qMeals = query(
       collection(db, 'meals'),
       where('uid', '==', auth.currentUser.uid)
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeMeals = onSnapshot(qMeals, (snapshot) => {
       const mealData = snapshot.docs
         .map(doc => ({ id: doc.id, ...doc.data() }))
         .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
@@ -33,7 +39,23 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
       handleFirestoreError(error, OperationType.LIST, 'meals');
     });
 
-    return () => unsubscribe();
+    const qWater = query(
+      collection(db, 'waterLogs'),
+      where('uid', '==', auth.currentUser.uid)
+    );
+
+    const unsubscribeWater = onSnapshot(qWater, (snapshot) => {
+      const waterData = snapshot.docs
+        .map(doc => ({ id: doc.id, ...doc.data() }));
+      setWaterLogs(waterData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'waterLogs');
+    });
+
+    return () => {
+      unsubscribeMeals();
+      unsubscribeWater();
+    };
   }, [auth.currentUser?.uid]);
 
   useEffect(() => {
@@ -61,6 +83,109 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
   const calorieGoal = userProfile?.dailyCalorieGoal || 2000;
   const remainingCalories = Math.max(0, calorieGoal - consumedCalories);
   const progress = Math.min(100, (consumedCalories / calorieGoal) * 100);
+
+  // Water calculations
+  const todayWaterLogs = waterLogs.filter(w => isToday(new Date(w.timestamp)));
+  const consumedWaterMl = todayWaterLogs.reduce((acc, w) => acc + (w.amount || 0), 0);
+  
+  const waterGoalLiters = useMemo(() => {
+    if (!userProfile?.weight || !userProfile?.height) return 2.5;
+    const w = parseFloat(userProfile.weight);
+    const h = parseFloat(userProfile.height) / 100;
+    const val = w / (h * h);
+    let waterMultiplier = 35;
+    if (val < 18.5) waterMultiplier = 40;
+    else if (val < 25) waterMultiplier = 35;
+    else if (val < 30) waterMultiplier = 30;
+    else waterMultiplier = 25;
+    if (userProfile.activityLevel === 'active' || userProfile.activityLevel === 'very_active') waterMultiplier += 5;
+    return ((w * waterMultiplier) / 1000).toFixed(1);
+  }, [userProfile]);
+  
+  const waterGoalMl = parseFloat(waterGoalLiters as string) * 1000;
+  const waterProgress = Math.min(100, (consumedWaterMl / waterGoalMl) * 100);
+
+  const handleAddWater = async (amount: number) => {
+    if (!auth.currentUser) return;
+    try {
+      await addDoc(collection(db, 'waterLogs'), {
+        uid: auth.currentUser.uid,
+        amount,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'waterLogs');
+    }
+  };
+
+  const handleRemoveWater = async (amount: number) => {
+    if (!auth.currentUser) return;
+    if (consumedWaterMl < amount) return;
+    try {
+      await addDoc(collection(db, 'waterLogs'), {
+        uid: auth.currentUser.uid,
+        amount: -amount,
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.WRITE, 'waterLogs');
+    }
+  };
+
+  // Evolution Chart Data
+  const chartData = useMemo(() => {
+    const data = [];
+    for (let i = 6; i >= 0; i--) {
+      const date = subDays(new Date(), i);
+      const dayMeals = meals.filter(m => {
+        const mDate = new Date(m.timestamp);
+        return mDate.getDate() === date.getDate() && mDate.getMonth() === date.getMonth();
+      });
+      const cals = dayMeals.reduce((acc, m) => acc + (m.calories || 0), 0);
+      data.push({
+        name: format(date, 'EEE', { locale: ptBR }),
+        calorias: cals,
+        meta: calorieGoal
+      });
+    }
+    return data;
+  }, [meals, calorieGoal]);
+
+  const handleDeleteMeal = async (id: string) => {
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
+    }
+    
+    try {
+      await deleteDoc(doc(db, 'meals', id));
+      setSelectedMeal(null);
+      setConfirmDelete(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, 'meals');
+    }
+  };
+
+  const handleSaveMeal = async () => {
+    if (!editFormData || !selectedMeal) return;
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, 'meals', selectedMeal.id), {
+        foodName: editFormData.foodName,
+        calories: editFormData.calories,
+        protein: editFormData.protein,
+        carbs: editFormData.carbs,
+        fat: editFormData.fat,
+      });
+      setSelectedMeal({ ...selectedMeal, ...editFormData });
+      setIsEditingMeal(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'meals');
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <div className="space-y-10 pb-12">
@@ -212,6 +337,68 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
 
         {/* Quick Stats Column */}
         <div className="lg:col-span-1 grid grid-cols-2 lg:grid-cols-1 gap-4">
+          {/* Water Tracker Card */}
+          <div className="col-span-2 lg:col-span-1 bg-blue-50 rounded-[2rem] p-6 border border-blue-100 shadow-sm relative overflow-hidden">
+            <div className="absolute -right-4 -bottom-4 opacity-10">
+              <Droplets className="w-32 h-32 text-blue-500" />
+            </div>
+            <div className="relative z-10 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-blue-600 font-black uppercase tracking-widest text-xs">
+                  <Droplets className="w-4 h-4" />
+                  Hidratação
+                </div>
+                <span className="text-xs font-bold text-blue-400">{waterGoalLiters}L / dia</span>
+              </div>
+              
+              <div className="flex items-baseline gap-2">
+                <span className="text-4xl font-black text-blue-900">{consumedWaterMl}</span>
+                <span className="text-sm font-bold text-blue-500">ml</span>
+              </div>
+
+              <div className="h-3 bg-blue-200/50 rounded-full overflow-hidden">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${waterProgress}%` }}
+                  className="h-full bg-blue-500 rounded-full"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => handleRemoveWater(250)}
+                    disabled={consumedWaterMl < 250}
+                    className="py-2 px-3 bg-white text-blue-600 font-black text-sm rounded-xl hover:bg-blue-100 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <button 
+                    onClick={() => handleAddWater(250)}
+                    className="flex-1 py-2 bg-white text-blue-600 font-black text-sm rounded-xl hover:bg-blue-100 transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <Plus className="w-3 h-3" /> 250ml
+                  </button>
+                </div>
+                <div className="flex gap-1">
+                  <button 
+                    onClick={() => handleRemoveWater(500)}
+                    disabled={consumedWaterMl < 500}
+                    className="py-2 px-3 bg-blue-600 text-white font-black text-sm rounded-xl hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    <Minus className="w-3 h-3" />
+                  </button>
+                  <button 
+                    onClick={() => handleAddWater(500)}
+                    className="flex-1 py-2 bg-blue-600 text-white font-black text-sm rounded-xl hover:bg-blue-700 transition-colors flex items-center justify-center gap-1 shadow-sm"
+                  >
+                    <Plus className="w-3 h-3" /> 500ml
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <StatCard 
             icon={<Utensils className="text-orange-500" />} 
             label="Refeições" 
@@ -224,20 +411,52 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
             value={`${todayMeals.reduce((acc, m) => acc + (m.protein || 0), 0)}g`} 
             color="bg-white"
           />
-          <StatCard 
-            icon={<Zap className="text-blue-500" />} 
-            label="Carbos" 
-            value={`${todayMeals.reduce((acc, m) => acc + (m.carbs || 0), 0)}g`} 
-            color="bg-white"
-          />
-          <StatCard 
-            icon={<Flame className="text-purple-500" />} 
-            label="Gorduras" 
-            value={`${todayMeals.reduce((acc, m) => acc + (m.fat || 0), 0)}g`} 
-            color="bg-white"
-          />
         </div>
       </div>
+
+      {/* Evolution Chart Section */}
+      <section className="bg-white rounded-[3rem] p-8 border border-slate-100 shadow-xl">
+        <div className="flex items-center justify-between mb-8">
+          <div className="space-y-1">
+            <h3 className="text-2xl font-black text-slate-900 flex items-center gap-3">
+              <div className="p-2 bg-purple-100 rounded-xl text-purple-600">
+                <TrendingUp className="w-5 h-5" />
+              </div>
+              Evolução Semanal
+            </h3>
+            <p className="text-slate-400 font-medium text-sm">Calorias consumidas nos últimos 7 dias</p>
+          </div>
+        </div>
+        
+        <div className="h-64 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <XAxis 
+                dataKey="name" 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 'bold' }} 
+                dy={10}
+              />
+              <YAxis 
+                axisLine={false} 
+                tickLine={false} 
+                tick={{ fill: '#94a3b8', fontSize: 12, fontWeight: 'bold' }}
+              />
+              <Tooltip 
+                cursor={{ fill: '#f8fafc' }}
+                contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                labelStyle={{ fontWeight: 'black', color: '#0f172a', marginBottom: '4px' }}
+              />
+              <Bar dataKey="calorias" radius={[8, 8, 8, 8]}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.calorias > entry.meta ? '#ef4444' : '#f97316'} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </section>
 
       {/* Recent Activity Section */}
       <section className="space-y-6">
@@ -246,7 +465,7 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
             <div className="p-2 bg-orange-100 rounded-xl text-orange-600">
               <Utensils className="w-5 h-5" />
             </div>
-            Refeições Recentes
+            Refeições de Hoje
           </h3>
           <button className="text-sm font-bold text-orange-600 flex items-center gap-1 hover:gap-2 transition-all">
             Ver tudo <ArrowRight className="w-4 h-4" />
@@ -257,17 +476,17 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
           <div className="flex justify-center p-20">
             <Loader2 className="w-10 h-10 animate-spin text-orange-500" />
           </div>
-        ) : meals.length === 0 ? (
+        ) : todayMeals.length === 0 ? (
           <div className="text-center p-20 bg-white rounded-[3rem] border-2 border-dashed border-slate-100 shadow-sm">
             <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mx-auto mb-4">
               <Utensils className="w-8 h-8 text-slate-300" />
             </div>
-            <p className="text-slate-400 font-bold">Nenhuma refeição registrada ainda.</p>
-            <p className="text-slate-300 text-sm">Comece analisando seu primeiro prato!</p>
+            <p className="text-slate-400 font-bold">Nenhuma refeição registrada hoje.</p>
+            <p className="text-slate-300 text-sm">Comece analisando seu primeiro prato do dia!</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {meals.slice(0, 4).map((meal, i) => (
+            {todayMeals.map((meal, i) => (
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -329,13 +548,17 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
               <div className="relative h-64">
                 <img src={selectedMeal.imageUrl} alt={selectedMeal.foodName} className="w-full h-full object-cover" />
                 <button 
-                  onClick={() => setSelectedMeal(null)}
+                  onClick={() => {
+                    setSelectedMeal(null);
+                    setIsEditingMeal(false);
+                    setConfirmDelete(false);
+                  }}
                   className="absolute top-6 right-6 p-2 bg-white/20 backdrop-blur-md text-white rounded-full hover:bg-white/40 transition-colors"
                 >
                   <ArrowRight className="w-6 h-6 rotate-180" />
                 </button>
                 <div className="absolute bottom-0 left-0 right-0 p-8 bg-gradient-to-t from-slate-900 to-transparent text-white">
-                  <h3 className="text-3xl font-black">{selectedMeal.foodName}</h3>
+                  <h3 className="text-3xl font-black"><span>{isEditingMeal ? 'Editar Refeição' : selectedMeal.foodName}</span></h3>
                   <p className="text-sm font-bold text-white/60 uppercase tracking-widest">
                     {format(new Date(selectedMeal.timestamp), "d 'de' MMMM 'às' HH:mm", { locale: ptBR })}
                   </p>
@@ -343,44 +566,143 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
               </div>
 
               <div className="p-8 space-y-8">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Calorias</p>
-                    <p className="text-4xl font-black text-slate-900">{selectedMeal.calories} <span className="text-sm font-bold text-slate-400">kcal</span></p>
+                {isEditingMeal ? (
+                  <div className="space-y-4">
+                    <div>
+                      <label className="text-xs font-bold text-slate-400 uppercase">Nome do Alimento</label>
+                      <input 
+                        type="text" 
+                        value={editFormData.foodName} 
+                        onChange={e => setEditFormData({...editFormData, foodName: e.target.value})}
+                        className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase">Calorias (kcal)</label>
+                        <input 
+                          type="number" 
+                          value={editFormData.calories} 
+                          onChange={e => setEditFormData({...editFormData, calories: Number(e.target.value)})}
+                          className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase">Proteínas (g)</label>
+                        <input 
+                          type="number" 
+                          value={editFormData.protein} 
+                          onChange={e => setEditFormData({...editFormData, protein: Number(e.target.value)})}
+                          className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase">Carboidratos (g)</label>
+                        <input 
+                          type="number" 
+                          value={editFormData.carbs} 
+                          onChange={e => setEditFormData({...editFormData, carbs: Number(e.target.value)})}
+                          className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-bold text-slate-400 uppercase">Gorduras (g)</label>
+                        <input 
+                          type="number" 
+                          value={editFormData.fat} 
+                          onChange={e => setEditFormData({...editFormData, fat: Number(e.target.value)})}
+                          className="w-full p-4 bg-slate-50 rounded-2xl border border-slate-200 font-bold text-slate-900 focus:outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-200 transition-all"
+                        />
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3 pt-4">
+                      <button
+                        onClick={() => setIsEditingMeal(false)}
+                        className="flex-1 py-4 bg-slate-100 text-slate-600 font-black rounded-[2rem] hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+                      >
+                        <X className="w-5 h-5" />
+                        <span>Cancelar</span>
+                      </button>
+                      <button
+                        onClick={handleSaveMeal}
+                        disabled={isSaving}
+                        className="flex-1 py-4 bg-emerald-500 text-white font-black rounded-[2rem] hover:bg-emerald-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        {isSaving ? <LoaderIcon className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
+                        <span>Salvar</span>
+                      </button>
+                    </div>
                   </div>
-                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Proteínas</p>
-                    <p className="text-4xl font-black text-slate-900">{selectedMeal.protein} <span className="text-sm font-bold text-slate-400">g</span></p>
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Calorias</p>
+                        <p className="text-4xl font-black text-slate-900">{selectedMeal.calories} <span className="text-sm font-bold text-slate-400">kcal</span></p>
+                      </div>
+                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Proteínas</p>
+                        <p className="text-4xl font-black text-slate-900">{selectedMeal.protein} <span className="text-sm font-bold text-slate-400">g</span></p>
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Carboidratos</p>
-                    <p className="text-4xl font-black text-slate-900">{selectedMeal.carbs} <span className="text-sm font-bold text-slate-400">g</span></p>
-                  </div>
-                  <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
-                    <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Gorduras</p>
-                    <p className="text-4xl font-black text-slate-900">{selectedMeal.fat} <span className="text-sm font-bold text-slate-400">g</span></p>
-                  </div>
-                </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Carboidratos</p>
+                        <p className="text-4xl font-black text-slate-900">{selectedMeal.carbs} <span className="text-sm font-bold text-slate-400">g</span></p>
+                      </div>
+                      <div className="bg-slate-50 p-6 rounded-[2rem] border border-slate-100">
+                        <p className="text-[10px] text-slate-400 uppercase font-black tracking-widest mb-1">Gorduras</p>
+                        <p className="text-4xl font-black text-slate-900">{selectedMeal.fat} <span className="text-sm font-bold text-slate-400">g</span></p>
+                      </div>
+                    </div>
 
-                <div className="p-6 bg-orange-50 rounded-[2rem] border border-orange-100 space-y-2">
-                  <div className="flex items-center gap-2 text-orange-600 font-black text-sm uppercase tracking-widest">
-                    <Zap className="w-4 h-4" />
-                    Análise da IA
-                  </div>
-                  <p className="text-slate-700 font-medium leading-relaxed italic">
-                    "{selectedMeal.analysis}"
-                  </p>
-                </div>
+                    <div className="p-6 bg-orange-50 rounded-[2rem] border border-orange-100 space-y-2">
+                      <div className="flex items-center gap-2 text-orange-600 font-black text-sm uppercase tracking-widest">
+                        <Zap className="w-4 h-4" />
+                        Análise da IA
+                      </div>
+                      <p className="text-slate-700 font-medium leading-relaxed italic">
+                        "{selectedMeal.analysis}"
+                      </p>
+                    </div>
 
-                <button
-                  onClick={() => setSelectedMeal(null)}
-                  className="w-full py-5 bg-slate-900 text-white font-black rounded-[2rem] hover:bg-slate-800 transition-all"
-                >
-                  Fechar Detalhes
-                </button>
+                    <div className="flex gap-3 pt-2">
+                      <button
+                        onClick={() => handleDeleteMeal(selectedMeal.id)}
+                        className={`flex-1 py-4 font-black rounded-[2rem] transition-all flex items-center justify-center gap-2 ${
+                          confirmDelete 
+                            ? 'bg-red-600 text-white hover:bg-red-700' 
+                            : 'bg-red-50 text-red-600 hover:bg-red-100'
+                        }`}
+                      >
+                        <Trash2 className="w-5 h-5" />
+                        <span>{confirmDelete ? 'Confirmar?' : 'Excluir'}</span>
+                      </button>
+                      <button
+                        onClick={() => {
+                          setEditFormData(selectedMeal);
+                          setIsEditingMeal(true);
+                        }}
+                        className="flex-1 py-4 bg-orange-50 text-orange-600 font-black rounded-[2rem] hover:bg-orange-100 transition-all flex items-center justify-center gap-2"
+                      >
+                        <Edit2 className="w-5 h-5" />
+                        <span>Editar</span>
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setSelectedMeal(null);
+                        setConfirmDelete(false);
+                      }}
+                      className="w-full py-5 bg-slate-900 text-white font-black rounded-[2rem] hover:bg-slate-800 transition-all"
+                    >
+                      <span>Fechar Detalhes</span>
+                    </button>
+                  </>
+                )}
               </div>
             </motion.div>
           </motion.div>

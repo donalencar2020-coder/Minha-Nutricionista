@@ -73,13 +73,37 @@ export function ProfileForm({ onComplete, initialData }: { onComplete: () => voi
     
     let category = '';
     let color = '';
+    let waterMultiplier = 35; // Base: 35ml per kg
     
-    if (val < 18.5) { category = 'Abaixo do peso'; color = 'text-blue-500'; }
-    else if (val < 25) { category = 'Peso normal'; color = 'text-emerald-500'; }
-    else if (val < 30) { category = 'Sobrepeso'; color = 'text-orange-500'; }
-    else { category = 'Obesidade'; color = 'text-red-500'; }
+    if (val < 18.5) { 
+      category = 'Abaixo do peso'; 
+      color = 'text-blue-500'; 
+      waterMultiplier = 40; // Needs more hydration to help with nutrient absorption
+    }
+    else if (val < 25) { 
+      category = 'Peso normal'; 
+      color = 'text-emerald-500'; 
+      waterMultiplier = 35;
+    }
+    else if (val < 30) { 
+      category = 'Sobrepeso'; 
+      color = 'text-orange-500'; 
+      waterMultiplier = 30; // Slightly less per kg to avoid water intoxication, but still high total volume
+    }
+    else { 
+      category = 'Obesidade'; 
+      color = 'text-red-500'; 
+      waterMultiplier = 25; // Adjusted for higher body mass index to prevent excessive volume
+    }
+
+    // Adjust for activity level
+    if (formData.activityLevel === 'active' || formData.activityLevel === 'very_active') {
+      waterMultiplier += 5;
+    }
     
-    return { value: val.toFixed(1), category, color };
+    const waterIntakeLiters = ((w * waterMultiplier) / 1000).toFixed(1);
+    
+    return { value: val.toFixed(1), category, color, waterIntakeLiters };
   })();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -188,19 +212,37 @@ export function ProfileForm({ onComplete, initialData }: { onComplete: () => voi
               </div>
 
               {bmi && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-between"
-                >
-                  <div className="space-y-0.5">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Seu IMC</p>
-                    <p className={`text-sm font-black ${bmi.color}`}>{bmi.category}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-2xl font-black text-slate-900">{bmi.value}</p>
-                  </div>
-                </motion.div>
+                <div className="grid grid-cols-2 gap-4">
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="p-4 bg-slate-50 rounded-2xl border border-slate-100 flex flex-col justify-between"
+                  >
+                    <div className="space-y-0.5 mb-2">
+                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest"><span>Seu IMC</span></p>
+                      <p className={`text-sm font-black ${bmi.color}`}><span>{bmi.category}</span></p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-3xl font-black text-slate-900"><span>{bmi.value}</span></p>
+                    </div>
+                  </motion.div>
+
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="p-4 bg-blue-50 rounded-2xl border border-blue-100 flex flex-col justify-between"
+                  >
+                    <div className="space-y-0.5 mb-2">
+                      <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest"><span>Meta de Água</span></p>
+                      <p className="text-sm font-black text-blue-600"><span>Diária</span></p>
+                    </div>
+                    <div className="text-left flex items-baseline gap-1">
+                      <p className="text-3xl font-black text-blue-900"><span>{bmi.waterIntakeLiters}</span></p>
+                      <span className="text-sm font-bold text-blue-500 uppercase">Litros</span>
+                    </div>
+                  </motion.div>
+                </div>
               )}
             </div>
 
@@ -263,7 +305,7 @@ export function ProfileForm({ onComplete, initialData }: { onComplete: () => voi
                           : "bg-white border-slate-100 text-slate-400 hover:border-slate-200"
                       )}
                     >
-                      {res}
+                      <span>{res}</span>
                     </button>
                   ))}
                 </div>
@@ -281,7 +323,7 @@ export function ProfileForm({ onComplete, initialData }: { onComplete: () => voi
             ) : (
               <>
                 <Save className="w-6 h-6 group-hover:scale-110 transition-transform" />
-                Salvar Perfil
+                <span>Salvar Perfil</span>
               </>
             )}
           </button>
@@ -296,7 +338,7 @@ function InputGroup({ label, icon, children }: any) {
     <div className="space-y-2">
       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
         <span className="text-orange-500">{icon}</span>
-        {label}
+        <span>{label}</span>
       </label>
       <div className="relative">
         {children}
@@ -314,8 +356,8 @@ function GoalOption({ active, onClick, label, desc }: any) {
       }`}
     >
       <div>
-        <p className={`font-black ${active ? 'text-orange-600' : 'text-slate-700'}`}>{label}</p>
-        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{desc}</p>
+        <p className={`font-black ${active ? 'text-orange-600' : 'text-slate-700'}`}><span>{label}</span></p>
+        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight"><span>{desc}</span></p>
       </div>
       {active ? (
         <CheckCircle2 className="w-5 h-5 text-orange-500" />
