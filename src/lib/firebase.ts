@@ -1,7 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { 
   getAuth, 
-  GoogleAuthProvider, 
   signInWithPopup, 
   signOut,
   signInWithEmailAndPassword,
@@ -19,7 +18,6 @@ export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence);
 
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {
   CREATE = 'create',

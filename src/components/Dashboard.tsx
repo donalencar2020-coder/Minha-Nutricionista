@@ -192,7 +192,7 @@ export function Dashboard({ userProfile }: { userProfile: any }) {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <h2 className="text-3xl font-black text-slate-900 flex items-center gap-3">
-            Olá, {userProfile?.name?.split(' ')[0]}! 👋
+            Olá, {(auth.currentUser?.displayName || userProfile?.name || 'Visitante').split(' ')[0]}! 👋
           </h2>
           <p className="text-slate-500 font-medium">Aqui está o seu resumo nutricional de hoje.</p>
         </div>

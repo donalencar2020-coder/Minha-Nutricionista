@@ -1,46 +1,24 @@
 import { useState } from 'react';
-import { auth, googleProvider } from '../lib/firebase';
+import { auth } from '../lib/firebase';
 import { 
-  signInWithPopup, 
   signOut, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
-  sendPasswordResetEmail
+  sendPasswordResetEmail,
+  updateProfile
 } from 'firebase/auth';
-import { LogIn, LogOut, Mail, Lock, UserPlus, Chrome, Loader2, AlertCircle } from 'lucide-react';
+import { LogIn, LogOut, Mail, Lock, UserPlus, Loader2, AlertCircle, User } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export function Auth({ user }: { user: any }) {
-  const [isEmailLogin, setIsEmailLogin] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
   const [isResettingPassword, setIsResettingPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  const handleGoogleLogin = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.error('Login error detailed:', error);
-      // Show more specific error messages for common issues
-      let friendlyError = 'Falha ao entrar com Google. Tente novamente.';
-      if (error.code === 'auth/unauthorized-domain') {
-        friendlyError = `Este domínio não está autorizado no Firebase. Adicione '${window.location.hostname}' aos domínios autorizados no Console do Firebase.`;
-      } else if (error.code === 'auth/popup-closed-by-user') {
-        friendlyError = 'O login foi cancelado porque o popup foi fechado.';
-      } else if (error.message) {
-        friendlyError = `Erro: ${error.message}`;
-      }
-      setError(friendlyError);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +26,13 @@ export function Auth({ user }: { user: any }) {
     setError(null);
     try {
       if (isSignUp) {
-        await createUserWithEmailAndPassword(auth, email, password);
+        if (!name.trim()) {
+          setError('Por favor, informe seu nome.');
+          setLoading(false);
+          return;
+        }
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        await updateProfile(userCredential.user, { displayName: name });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
@@ -119,33 +103,6 @@ export function Auth({ user }: { user: any }) {
               Sair
             </button>
           </motion.div>
-        ) : !isEmailLogin ? (
-          <motion.div
-            key="social"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -10 }}
-            className="space-y-4"
-          >
-            <button
-              onClick={handleGoogleLogin}
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-white text-slate-900 font-black rounded-[1.5rem] hover:bg-slate-50 transition-all shadow-xl shadow-slate-200 border border-slate-100"
-            >
-              {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Chrome className="w-5 h-5 text-orange-500" />}
-              Entrar com Google
-            </button>
-            <button
-              onClick={() => {
-                setIsEmailLogin(true);
-                setIsResettingPassword(false);
-              }}
-              className="w-full flex items-center justify-center gap-3 px-6 py-4 bg-slate-900 text-white font-black rounded-[1.5rem] hover:bg-slate-800 transition-all shadow-xl shadow-slate-900/20"
-            >
-              <Mail className="w-5 h-5" />
-              Entrar com E-mail
-            </button>
-          </motion.div>
         ) : isResettingPassword ? (
           <motion.div
             key="reset"
@@ -190,7 +147,7 @@ export function Auth({ user }: { user: any }) {
                     placeholder="seu@email.com"
                   />
                   <p className="text-[10px] text-slate-400 font-bold mt-2">
-                    Esqueceu qual e-mail usou? Tente retornar e fazer login com o Google.
+                    Enviaremos um link seguro para você redefinir sua senha.
                   </p>
                 </div>
 
@@ -235,6 +192,23 @@ export function Auth({ user }: { user: any }) {
             </div>
 
             <form onSubmit={handleEmailAuth} className="space-y-4">
+              {isSignUp && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <User className="w-3 h-3 text-orange-500" />
+                    Nome
+                  </label>
+                  <input
+                    type="text"
+                    required={isSignUp}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-5 py-4 focus:ring-2 focus:ring-orange-500 transition-all font-bold text-slate-700"
+                    placeholder="Seu nome"
+                  />
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                   <Mail className="w-3 h-3 text-orange-500" />
@@ -311,12 +285,6 @@ export function Auth({ user }: { user: any }) {
                 <span>
                   {isSignUp ? 'Já tem uma conta? Entre' : 'Não tem conta? Crie uma'}
                 </span>
-              </button>
-              <button
-                onClick={() => setIsEmailLogin(false)}
-                className="text-xs font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-widest"
-              >
-                Voltar para opções sociais
               </button>
             </div>
           </motion.div>
