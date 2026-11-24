@@ -1,0 +1,22 @@
+{
+  "name": "NutriTrack · Sua Nutri com IA",
+  "short_name": "NutriTrack",
+  "description": "Analise suas refeições com IA, acompanhe calorias, água e peso, e siga seu plano alimentar.",
+  "lang": "pt-BR",
+  "start_url": "/#resumo",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6f7f9",
+  "theme_color": "#0f172a",
+  "categories": ["health", "food", "lifestyle"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Registrar refeição", "url": "/#analisar", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Plano alimentar", "url": "/#plano", "icons": [{ "src": "/icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}

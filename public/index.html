@@ -11,7 +11,9 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="NutriTrack" />
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230f172a'/%3E%3Cpath d='M27 39a5 5 0 0 0 5-5c0-2.8-1-4-2-6-2.1-4.3-.4-8.1 4-12 1 5 4 9.8 8 13 4 3.2 6 7 6 11a14 14 0 1 1-28 0c0-2.3.9-4.6 2-6a5 5 0 0 0 5 5z' fill='none' stroke='%23f97316' stroke-width='3.5' stroke-linejoin='round'/%3E%3C/svg%3E" />
-<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230f172a'/%3E%3Cpath d='M27 39a5 5 0 0 0 5-5c0-2.8-1-4-2-6-2.1-4.3-.4-8.1 4-12 1 5 4 9.8 8 13 4 3.2 6 7 6 11a14 14 0 1 1-28 0c0-2.3.9-4.6 2-6a5 5 0 0 0 5 5z' fill='none' stroke='%23f97316' stroke-width='3.5' stroke-linejoin='round'/%3E%3C/svg%3E" />
+<link rel="manifest" href="/manifest.webmanifest" />
+<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+<link rel="alternate icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%230f172a'/%3E%3Cpath d='M27 39a5 5 0 0 0 5-5c0-2.8-1-4-2-6-2.1-4.3-.4-8.1 4-12 1 5 4 9.8 8 13 4 3.2 6 7 6 11a14 14 0 1 1-28 0c0-2.3.9-4.6 2-6a5 5 0 0 0 5 5z' fill='none' stroke='%23f97316' stroke-width='3.5' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -192,6 +194,25 @@ select.input{background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w
 .toast.err{background:#b91c1c;border:0}
 .toast.ok .ic{color:#34d399}
 
+/* itens da refeição, banners, plano, switches */
+.item-row{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#fff;border:1px solid #eef1f5;border-radius:16px}
+.qty{display:flex;align-items:center;background:var(--soft);border-radius:12px;padding:3px}
+.qty button{width:30px;height:30px;border-radius:9px;display:grid;place-items:center;color:var(--ink2)}
+.qty button:hover{background:#e2e8f0}
+.qty input{width:52px;border:0;background:transparent;text-align:center;font-weight:800;font-size:15px;outline:none;-moz-appearance:textfield}
+.qty input::-webkit-outer-spin-button,.qty input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.kc{min-width:64px;text-align:right;white-space:nowrap}
+@media(max-width:420px){.item-row{flex-wrap:wrap}.item-row .grow{flex-basis:100%}.kc{margin-left:auto}}
+.banner{position:relative;display:flex;align-items:center;gap:12px;background:#fff;border:1px solid var(--or-line);border-left:4px solid var(--or);border-radius:18px;padding:12px 44px 12px 14px;box-shadow:var(--sh);flex-wrap:wrap}
+.banner .grow{min-width:150px}
+.banner .x{position:absolute;top:6px;right:6px;width:30px;height:30px}
+@media(max-width:480px){.banner .act{margin-left:50px}}
+.plan-opt{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:var(--soft);border:1px solid #e9eef3}
+.plan-opt.today{background:var(--or-soft);border-color:var(--or-line)}
+.switch{width:42px;height:24px;border-radius:999px;background:#cbd5e1;position:relative;flex-shrink:0;transition:background .2s}
+.switch i{position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .2s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.switch.on{background:var(--or)} .switch.on i{left:21px}
+
 /* misc */
 .empty{padding:36px 16px;text-align:center;color:var(--muted2)}
 .empty .icon-box{margin:0 auto 12px;width:56px;height:56px;border-radius:18px}
@@ -244,7 +265,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore,
-  doc, collection, query, where, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc,
+  doc, collection, query, where, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDoc, deleteField,
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ---------------------------------------------------------------------
@@ -260,7 +281,7 @@ const firebaseConfig = {
 };
 const FIRESTORE_DB_ID = "ai-studio-2948fa06-021f-4fbb-9b6e-d240f774a5ec";
 const AI_ENDPOINT = "/api/ai"; // Netlify Function (netlify/functions/ai.mjs)
-const APP_VERSION = "2.0";
+const APP_VERSION = "2.1";
 
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
@@ -623,12 +644,13 @@ function AuthScreen() {
 // ---------------------------------------------------------------------
 // Perfil
 // ---------------------------------------------------------------------
-function ProfileForm({ user, profile, onSaved, onboarding }) {
+function ProfileForm({ user, profile, weights = [], onSaved, onboarding }) {
   const init = () => ({
     name: profile?.name || user.displayName || "",
     age: profile?.age ?? "", weight: profile?.weight ?? "", height: profile?.height ?? "",
     gender: profile?.gender || "male", activityLevel: profile?.activityLevel || "moderate",
     goal: profile?.goal || "maintain", restrictions: profile?.restrictions || [],
+    targetWeight: profile?.targetWeight ?? "",
   });
   const [f, setF] = useState(init);
   const [saving, setSaving] = useState(false);
@@ -647,12 +669,17 @@ function ProfileForm({ user, profile, onSaved, onboarding }) {
         age: f.age === "" ? null : int(f.age),
         weight: f.weight === "" ? null : Math.round(num(f.weight) * 10) / 10,
         height: f.height === "" ? null : int(f.height),
+        targetWeight: f.targetWeight === "" || !num(f.targetWeight) ? null : Math.round(num(f.targetWeight) * 10) / 10,
         uid: user.uid, email: user.email,
         dailyCalorieGoal: g.kcal, waterGoalMl: g.waterMl,
         updatedAt: new Date().toISOString(),
         ...(profile ? {} : { createdAt: new Date().toISOString() }),
       });
       await setDoc(doc(db, "users", user.uid), data, { merge: true });
+      const lastLogged = weights.length ? num(weights[weights.length - 1].weight) : null;
+      if (data.weight && data.weight !== lastLogged && (data.weight !== num(profile?.weight) || !weights.length)) {
+        addDoc(collection(db, "weightLogs"), { uid: user.uid, weight: data.weight, timestamp: new Date().toISOString() }).catch(() => {});
+      }
       toast("Perfil salvo!");
       onSaved?.();
     } catch (ex) {
@@ -680,6 +707,7 @@ function ProfileForm({ user, profile, onSaved, onboarding }) {
             <div><label class="label"><${Icon} n="scale" s=${13} />Peso (kg)</label><input class="input" type="number" inputmode="decimal" step="0.1" min="25" max="350" value=${f.weight} onInput=${set("weight")} placeholder="70.5" required /></div>
             <div><label class="label"><${Icon} n="ruler" s=${13} />Altura (cm)</label><input class="input" type="number" inputmode="numeric" min="100" max="250" value=${f.height} onInput=${set("height")} placeholder="175" required /></div>
           </div>
+          <div><label class="label"><${Icon} n="target" s=${13} />Meta de peso (kg) · opcional</label><input class="input" type="number" inputmode="decimal" step="0.1" min="30" max="300" value=${f.targetWeight} onInput=${set("targetWeight")} placeholder="Ex: 95" /></div>
           <div class="grid3">
             <div class="tile"><div class="eyebrow">IMC</div><div class="h3 num">${g.bmi || "—"}</div><div class=${"tiny b " + (g.bmiColor || "")}>${g.bmiCat || ""}</div></div>
             <div class="tile" style="background:var(--bl-soft)"><div class="eyebrow">Água/dia</div><div class="h3 num bl">${(g.waterMl / 1000).toFixed(1)}<span class="tiny"> L</span></div></div>
@@ -705,6 +733,279 @@ function ProfileForm({ user, profile, onSaved, onboarding }) {
       <button class="btn btn-or btn-lg btn-block" disabled=${saving}>${saving ? html`<${Spinner} />` : html`<${Icon} n="save" />${onboarding ? "Começar" : "Salvar perfil"}`}</button>
     </div>
   </form>`;
+}
+
+// ---------------------------------------------------------------------
+// Utilidades extras (refeições por itens, peso, lembretes)
+// ---------------------------------------------------------------------
+const mealTypeFor = (d = new Date()) => { const h = d.getHours() + d.getMinutes() / 60; return h < 10 ? "Café da Manhã" : h < 12 ? "Lanche da Manhã" : h < 15 ? "Almoço" : h < 18.5 ? "Lanche da Tarde" : h < 22.5 ? "Jantar" : "Ceia"; };
+const dayOfYear = (d = new Date()) => Math.floor((d - new Date(d.getFullYear(), 0, 0)) / 864e5);
+const fmtKg = (v) => num(v).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const recalcItem = (it, grams) => {
+  const g = Math.max(0, Math.round(num(grams))); const p = it.per100 || {}; const f = g / 100;
+  return { ...it, grams: g, kcal: Math.round(num(p.kcal) * f), protein: Math.round(num(p.protein) * f), carbs: Math.round(num(p.carbs) * f), fat: Math.round(num(p.fat) * f) };
+};
+const sumItems = (items) => items.reduce((a, i) => ({ calories: a.calories + int(i.kcal), protein: a.protein + int(i.protein), carbs: a.carbs + int(i.carbs), fat: a.fat + int(i.fat) }), { calories: 0, protein: 0, carbs: 0, fat: 0 });
+function normalizeDraft(r) {
+  let items = (Array.isArray(r?.items) ? r.items : []).slice(0, 15).map((i) => ({
+    name: str(i?.name || "Item", 60), ref: i?.ref || null, source: i?.source === "tabela" ? "tabela" : "ia",
+    grams: int(i?.grams), per100: { kcal: num(i?.per100?.kcal), protein: num(i?.per100?.protein), carbs: num(i?.per100?.carbs), fat: num(i?.per100?.fat) },
+    kcal: int(i?.kcal), protein: int(i?.protein), carbs: int(i?.carbs), fat: int(i?.fat),
+  }));
+  if (!items.length) {
+    const m = normalizeMeal(r);
+    items = [{ name: "Porção estimada", ref: null, source: "ia", grams: 100, per100: { kcal: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat }, kcal: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat }];
+  }
+  return { foodName: str(r?.foodName || "Refeição", 80), items, analysis: str(r?.analysis || "", 800) };
+}
+const itemsForDb = (items) => items.map((i) => ({ name: str(i.name, 60), ref: i.ref || null, source: i.source || "ia", grams: int(i.grams), per100: { kcal: num(i.per100?.kcal), protein: num(i.per100?.protein), carbs: num(i.per100?.carbs), fat: num(i.per100?.fat) }, kcal: int(i.kcal), protein: int(i.protein), carbs: int(i.carbs), fat: int(i.fat) }));
+
+// Salva refeição; a foto vai para a coleção mealPhotos e a refeição guarda só uma miniatura
+async function saveMeal(user, data, { image } = {}) {
+  let photoId = null, thumb = null;
+  if (image) {
+    try {
+      const ref = await addDoc(collection(db, "mealPhotos"), { uid: user.uid, data: image, createdAt: new Date().toISOString() });
+      photoId = ref.id;
+      thumb = await compressImage(image, 160, 0.6);
+    } catch (e) {
+      console.warn("Foto não salva separadamente, guardando versão reduzida:", e?.code || e);
+      thumb = await compressImage(image, 360, 0.6).catch(() => null);
+    }
+  }
+  return addDoc(collection(db, "meals"), clean({ uid: user.uid, imageUrl: null, photoId, thumb, mealType: mealTypeFor(), timestamp: new Date().toISOString(), ...data }));
+}
+const mealImg = (m) => m.thumb || m.imageUrl || null;
+
+// Peso: registra e recalcula metas no perfil
+async function applyWeightToProfile(user, profile, kg, silent) {
+  const g = calcGoals({ ...profile, weight: kg });
+  await setDoc(doc(db, "users", user.uid), { uid: user.uid, weight: kg, dailyCalorieGoal: g.kcal, waterGoalMl: g.waterMl, updatedAt: new Date().toISOString() }, { merge: true });
+  if (silent) return;
+  const old = int(profile.dailyCalorieGoal);
+  toast(old && old !== g.kcal ? `Peso salvo! Meta recalculada: ${g.kcal} kcal/dia` : "Peso registrado!");
+}
+async function logWeight(user, profile, kg) {
+  const v = Math.round(num(kg) * 10) / 10;
+  if (!(v >= 25 && v <= 350)) throw new Error("Informe um peso válido (em kg).");
+  await addDoc(collection(db, "weightLogs"), { uid: user.uid, weight: v, timestamp: new Date().toISOString() });
+  await applyWeightToProfile(user, profile, v);
+}
+
+// Lembretes (usados nos avisos do Resumo e nas notificações)
+function computeReminders({ profile, meals, water, plan, weights, now = new Date() }) {
+  const out = [];
+  const r = { water: true, meals: true, weighIn: true, ...(profile?.reminders || {}) };
+  const h = now.getHours() + now.getMinutes() / 60;
+  if (r.water && h >= 9 && h <= 21.5) {
+    const goal = int(profile.waterGoalMl) || calcGoals(profile).waterMl;
+    const drunk = water.filter((w) => isToday(w.timestamp)).reduce((a, w) => a + num(w.amount), 0);
+    const expected = Math.round((goal * Math.min(1, (h - 7) / 14)) / 50) * 50;
+    if (drunk < expected - 500) out.push({ id: `water-${dayKey()}-${Math.floor(h / 2)}`, icon: "droplet", title: "Hora de beber água", text: `Você tomou ${drunk} ml. Até agora o ideal seria uns ${expected} ml.`, action: "agua" });
+  }
+  if (r.meals && plan?.meals?.length) {
+    for (const m of plan.meals) {
+      const [hh, mm] = String(m.time || "").split(":").map(Number);
+      if (!Number.isFinite(hh)) continue;
+      const t = hh + (mm || 0) / 60;
+      if (h < t + 0.75 || h > t + 3) continue;
+      const since = new Date(now); since.setHours(hh, (mm || 0) - 90, 0, 0);
+      if (!meals.some((x) => new Date(x.timestamp) >= since)) out.push({ id: `meal-${dayKey()}-${m.name}`, icon: "utensils", title: `${m.name} · ${m.time}`, text: "Ainda não registrado. Já comeu? Registre para manter o controle.", action: "plano" });
+    }
+  }
+  if (r.weighIn && h >= 7) {
+    const last = weights.length ? new Date(weights[weights.length - 1].timestamp) : null;
+    const days = last ? (now - last) / 864e5 : Infinity;
+    if (days >= 7) out.push({ id: `weigh-${dayKey()}`, icon: "scale", title: "Pesagem semanal", text: last ? `Sua última pesagem foi há ${Math.floor(days)} dias.` : "Registre seu peso para acompanhar a evolução.", action: "peso" });
+  }
+  return out;
+}
+async function showNotification(r) {
+  const opts = { body: r.text, icon: "/icons/icon-192.png", badge: "/icons/icon-192.png", tag: r.id, data: { url: "/#resumo" } };
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration?.();
+    if (reg) return reg.showNotification(r.title, opts);
+  } catch {}
+  try { new Notification(r.title, opts); } catch {}
+}
+
+function useWidth(min = 280) {
+  const ref = useRef(null);
+  const [w, setW] = useState(600);
+  useEffect(() => {
+    const el = ref.current; if (!el) return;
+    const upd = () => setW(Math.max(min, Math.round(el.clientWidth)));
+    upd();
+    const ro = window.ResizeObserver ? new ResizeObserver(upd) : null;
+    ro ? ro.observe(el) : window.addEventListener("resize", upd);
+    return () => (ro ? ro.disconnect() : window.removeEventListener("resize", upd));
+  }, []);
+  return [ref, w];
+}
+
+// ---- Editor de itens (usado na análise e na edição da refeição) ----
+function ItemsEditor({ items, onChange }) {
+  const [adding, setAdding] = useState(null);
+  const setG = (i, g) => onChange(items.map((it, j) => (j === i ? recalcItem(it, g) : it)));
+  const rm = (i) => onChange(items.filter((_, j) => j !== i));
+  const add = () => {
+    const g = int(adding.grams), k = int(adding.kcal);
+    if (!adding.name.trim() || !g) return;
+    onChange([...items, { name: str(adding.name, 60), ref: null, source: "manual", grams: g, per100: { kcal: (k / g) * 100, protein: 0, carbs: 0, fat: 0 }, kcal: k, protein: 0, carbs: 0, fat: 0 }]);
+    setAdding(null);
+  };
+  return html`<div class="stack" style="gap:8px">
+    ${items.map((it, i) => html`<div class="item-row" key=${i}>
+      <div class="grow" style="min-width:0">
+        <div class="b small trunc">${it.name}</div>
+        <div class="tiny muted2">${it.source === "tabela" ? "Tabela TACO" : it.source === "manual" ? "Adicionado por você" : "Estimativa da IA"} · ${Math.round(num(it.per100?.kcal))} kcal/100g</div>
+      </div>
+      <div class="qty">
+        <button type="button" onClick=${() => setG(i, Math.max(0, int(it.grams) - 10))} aria-label="Menos 10 gramas"><${Icon} n="minus" s=${14} /></button>
+        <input type="number" inputmode="numeric" min="0" value=${it.grams} onInput=${(e) => setG(i, e.target.value)} aria-label=${"Gramas de " + it.name} />
+        <button type="button" onClick=${() => setG(i, int(it.grams) + 10)} aria-label="Mais 10 gramas"><${Icon} n="plus" s=${14} /></button>
+      </div>
+      <div class="kc num"><b>${int(it.kcal)}</b><span class="tiny muted2"> kcal</span></div>
+      <button type="button" class="icon-btn" style="width:32px;height:32px" onClick=${() => rm(i)} aria-label=${"Remover " + it.name}><${Icon} n="x" s=${15} /></button>
+    </div>`)}
+    ${adding
+      ? html`<div class="item-row" style="flex-wrap:wrap">
+          <input class="input grow" style="padding:9px 12px;min-width:140px" placeholder="Item (ex: suco)" value=${adding.name} onInput=${(e) => setAdding({ ...adding, name: e.target.value })} />
+          <input class="input" style="padding:9px 12px;width:84px" type="number" inputmode="numeric" placeholder="g/ml" value=${adding.grams} onInput=${(e) => setAdding({ ...adding, grams: e.target.value })} />
+          <input class="input" style="padding:9px 12px;width:84px" type="number" inputmode="numeric" placeholder="kcal" value=${adding.kcal} onInput=${(e) => setAdding({ ...adding, kcal: e.target.value })} />
+          <button type="button" class="btn btn-dark btn-sm" onClick=${add}>Ok</button>
+          <button type="button" class="btn btn-ghost btn-sm" onClick=${() => setAdding(null)}>Cancelar</button>
+        </div>`
+      : html`<button type="button" class="link" style="align-self:flex-start" onClick=${() => setAdding({ name: "", grams: "", kcal: "" })}><${Icon} n="plus" s=${15} />Adicionar item</button>`}
+  </div>`;
+}
+
+// ---- Peso ----
+function WeightChart({ points, target }) {
+  const [box, W] = useWidth();
+  const H = 180, padL = 34, padR = 12, padT = 16, padB = 24;
+  if (points.length < 2) return html`<div ref=${box} class="tile small muted center" style="padding:18px">Registre pelo menos 2 pesagens para ver o gráfico da sua evolução.</div>`;
+  const vals = points.map((p) => num(p.weight));
+  const lo = Math.floor(Math.min(...vals, target || Infinity) - 1), hi = Math.ceil(Math.max(...vals, target || -Infinity) + 1);
+  const t0 = new Date(points[0].timestamp).getTime(), t1 = new Date(points[points.length - 1].timestamp).getTime();
+  const x = (t) => padL + ((t - t0) / Math.max(1, t1 - t0)) * (W - padL - padR);
+  const y = (v) => padT + (1 - (v - lo) / Math.max(1, hi - lo)) * (H - padT - padB);
+  const path = points.map((p, i) => `${i ? "L" : "M"}${x(new Date(p.timestamp).getTime()).toFixed(1)},${y(num(p.weight)).toFixed(1)}`).join(" ");
+  const ticks = [lo, Math.round((lo + hi) / 2), hi];
+  return html`<div ref=${box}>
+    <svg viewBox=${`0 0 ${W} ${H}`} width="100%" style="display:block" role="img" aria-label="Evolução do peso">
+      ${ticks.map((v) => html`<g><line x1=${padL} x2=${W - padR} y1=${y(v)} y2=${y(v)} stroke="#eef1f5" /><text x=${padL - 6} y=${y(v) + 4} text-anchor="end" font-size="11" font-weight="700" fill="#94a3b8">${v}</text></g>`)}
+      ${target > 0 && html`<line x1=${padL} x2=${W - padR} y1=${y(target)} y2=${y(target)} stroke="#10b981" stroke-dasharray="6 6" stroke-width="1.5" />`}
+      <path d=${path} fill="none" stroke="#f97316" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" />
+      ${points.map((p, i) => html`<circle cx=${x(new Date(p.timestamp).getTime())} cy=${y(num(p.weight))} r=${i === points.length - 1 ? 5 : 3.5} fill=${i === points.length - 1 ? "#ea580c" : "#fff"} stroke="#f97316" stroke-width="2" />`)}
+      <text x=${padL} y=${H - 6} font-size="11" font-weight="700" fill="#94a3b8">${fmtDate(points[0].timestamp, { day: "numeric", month: "short" })}</text>
+      <text x=${W - padR} y=${H - 6} text-anchor="end" font-size="11" font-weight="700" fill="#94a3b8">${fmtDate(points[points.length - 1].timestamp, { day: "numeric", month: "short" })}</text>
+    </svg>
+    ${target > 0 && html`<div class="row tiny muted b" style="gap:6px;margin-top:4px"><span style="width:16px;border-top:2px dashed #10b981;display:inline-block"></span>Meta: ${fmtKg(target)} kg</div>`}
+  </div>`;
+}
+
+function WeightQuickModal({ user, profile, onClose }) {
+  const [v, setV] = useState(profile.weight ? String(profile.weight) : "");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const save = async (e) => {
+    e.preventDefault(); setBusy(true); setErr(null);
+    try { await logWeight(user, profile, v); onClose(); } catch (ex) { setErr(ex.message || "Não foi possível salvar."); } finally { setBusy(false); }
+  };
+  return html`<${Modal} onClose=${onClose} title="Registrar peso">
+    <form class="stack" onSubmit=${save}>
+      <p class="small muted">Pese-se de preferência pela manhã, em jejum, sempre na mesma balança. Sua meta de calorias será recalculada.</p>
+      <div><label class="label"><${Icon} n="scale" s=${13} />Peso de hoje (kg)</label>
+        <input class="input" type="number" inputmode="decimal" step="0.1" min="25" max="350" value=${v} onInput=${(e) => setV(e.target.value)} required autofocus /></div>
+      ${err && html`<div class="err"><${Icon} n="alert" s=${18} />${err}</div>`}
+      <button class="btn btn-or btn-lg btn-block" disabled=${busy}>${busy ? html`<${Spinner} />` : html`<${Icon} n="save" />Salvar peso`}</button>
+    </form>
+  <//>`;
+}
+
+function WeightSection({ user, profile, weights }) {
+  const [open, setOpen] = useState(false);
+  const pts = weights.length ? weights : profile.weight ? [{ id: "base", weight: profile.weight, timestamp: profile.createdAt || profile.updatedAt || new Date().toISOString() }] : [];
+  const cur = pts.length ? num(pts[pts.length - 1].weight) : num(profile.weight);
+  const first = pts.length ? num(pts[0].weight) : cur;
+  const diff = Math.round((cur - first) * 10) / 10;
+  const target = num(profile.targetWeight);
+  const left = target ? Math.round((cur - target) * 10) / 10 : null;
+  const del = async (w) => {
+    if (!(await confirmAsk({ title: "Apagar pesagem?", text: `${fmtKg(w.weight)} kg de ${fmtDate(w.timestamp, { day: "numeric", month: "short" })} será removida.`, ok: "Apagar", danger: true }))) return;
+    try {
+      await deleteDoc(doc(db, "weightLogs", w.id));
+      const rest = weights.filter((x) => x.id !== w.id);
+      if (rest.length && w.id === weights[weights.length - 1].id) await applyWeightToProfile(user, profile, num(rest[rest.length - 1].weight), true);
+      toast("Pesagem apagada.");
+    } catch { toast("Não foi possível apagar.", "err"); }
+  };
+  return html`<div class="card stack" style="max-width:720px;margin:0 auto 20px">
+    ${open && html`<${WeightQuickModal} user=${user} profile=${profile} onClose=${() => setOpen(false)} />`}
+    <div class="between" style="flex-wrap:wrap">
+      <div class="row"><div class="icon-box ib-or"><${Icon} n="scale" s=${20} /></div><div><div class="h2">Evolução do peso</div><div class="small muted2">A meta de calorias se ajusta a cada pesagem</div></div></div>
+      <button class="btn btn-dark btn-sm" onClick=${() => setOpen(true)}><${Icon} n="plus" s=${16} />Registrar peso</button>
+    </div>
+    <div class="grid3">
+      <div class="tile"><div class="eyebrow">Atual</div><div class="h3 num">${cur ? fmtKg(cur) : "—"}<span class="tiny muted2"> kg</span></div></div>
+      <div class="tile"><div class="eyebrow">Variação</div><div class=${"h3 num " + (diff < 0 ? "gr" : diff > 0 ? "rd" : "")}>${diff > 0 ? "+" : ""}${fmtKg(diff)}<span class="tiny muted2"> kg</span></div></div>
+      <div class="tile"><div class="eyebrow">${target ? "Falta p/ meta" : "Meta"}</div><div class="h3 num">${target ? (left > 0 ? fmtKg(left) : "✓") : "—"}<span class="tiny muted2">${target && left > 0 ? " kg" : ""}</span></div></div>
+    </div>
+    <${WeightChart} points=${pts} target=${target} />
+    ${weights.length > 0 && html`<div class="stack" style="gap:6px">
+      <div class="eyebrow">Últimas pesagens</div>
+      ${weights.slice(-6).reverse().map((w) => html`<div class="between small" key=${w.id} style="padding:6px 2px;border-bottom:1px solid #f1f4f8">
+        <span class="muted">${cap(fmtDate(w.timestamp, { weekday: "short", day: "numeric", month: "short" }))}</span>
+        <span class="row" style="gap:6px"><b class="num">${fmtKg(w.weight)} kg</b><button class="icon-btn" style="width:30px;height:30px" onClick=${() => del(w)} aria-label="Apagar pesagem"><${Icon} n="trash" s=${14} /></button></span>
+      </div>`)}
+    </div>`}
+    ${!target && html`<p class="tiny muted">Dica: defina uma meta de peso no formulário abaixo para acompanhar quanto falta.</p>`}
+  </div>`;
+}
+
+function RemindersCard({ user, profile }) {
+  const r = { water: true, meals: true, weighIn: true, ...(profile.reminders || {}) };
+  const supported = "Notification" in window;
+  const [perm, setPerm] = useState(supported ? Notification.permission : "unsupported");
+  const [on, setOn] = useState(store.get("notify", false));
+  const toggle = (k) => setDoc(doc(db, "users", user.uid), { uid: user.uid, reminders: { ...r, [k]: !r[k] } }, { merge: true }).catch(() => toast("Erro ao salvar.", "err"));
+  const enable = async () => {
+    if (!supported) return;
+    let p = Notification.permission;
+    if (p !== "granted") p = await Notification.requestPermission();
+    setPerm(p);
+    if (p === "granted") { store.set("notify", true); setOn(true); toast("Notificações ativadas neste aparelho!"); showNotification({ id: "test", title: "NutriTrack", text: "Pronto! Vou te lembrar da água, das refeições e da pesagem." }); }
+    else toast("Permissão negada no navegador.", "err");
+  };
+  const disable = () => { store.set("notify", false); setOn(false); toast("Notificações desativadas neste aparelho."); };
+  const Row = ({ k, icon, label, desc }) => html`<button type="button" class=${"opt " + (r[k] ? "on" : "")} onClick=${() => toggle(k)}>
+    <div class="row" style="gap:12px"><${Icon} n=${icon} s=${18} c=${r[k] ? "or" : "muted2"} /><div><div class="b">${label}</div><div class="tiny muted2">${desc}</div></div></div>
+    <span class=${"switch " + (r[k] ? "on" : "")}><i></i></span>
+  </button>`;
+  return html`<div class="card stack" style="max-width:720px;margin:0 auto 20px">
+    <div class="row"><div class="icon-box ib-bl"><${Icon} n="clock" s=${20} /></div><div><div class="h2">Lembretes</div><div class="small muted2">Avisos no Resumo e, se quiser, notificações</div></div></div>
+    <${Row} k="water" icon="droplet" label="Água" desc="Quando você estiver atrasado na meta do dia" />
+    <${Row} k="meals" icon="utensils" label="Refeições" desc="No horário das refeições do seu plano" />
+    <${Row} k="weighIn" icon="scale" label="Pesagem semanal" desc="Quando passar 7 dias sem registrar o peso" />
+    ${perm === "unsupported" ? html`<p class="tiny muted">Este navegador não suporta notificações. No iPhone, instale o app na Tela de Início primeiro.</p>`
+      : on && perm === "granted" ? html`<div class="between small"><span class="row gr b" style="gap:6px"><${Icon} n="check" s=${16} />Notificações ativas neste aparelho</span><button class="btn btn-ghost btn-sm" onClick=${disable}>Desativar</button></div>`
+      : html`<button class="btn btn-soft btn-block" onClick=${enable}><${Icon} n="zap" s=${18} />Ativar notificações neste aparelho</button>`}
+    <p class="tiny muted">As notificações funcionam enquanto o NutriTrack estiver aberto ou em segundo plano. Instalado na tela inicial, ele fica mais tempo ativo.</p>
+  </div>`;
+}
+
+function DisclaimerModal({ user, onClose }) {
+  const ok = async () => { try { await setDoc(doc(db, "users", user.uid), { uid: user.uid, disclaimerAck: new Date().toISOString() }, { merge: true }); } catch {} onClose(); };
+  return html`<${Modal} onClose=${ok} title="Antes de começar">
+    <div class="stack">
+      <div class="row" style="gap:12px;align-items:flex-start"><div class="icon-box ib-or"><${Icon} n="shield" s=${20} /></div>
+        <p class="small" style="color:#334155">O NutriTrack usa inteligência artificial e tabelas de referência para <b>estimar</b> calorias e sugerir planos. Os valores são aproximados.</p></div>
+      <p class="small" style="color:#334155">O app <b>não substitui</b> nutricionista nem médico. Procure um profissional antes de mudanças grandes na alimentação, principalmente se você tiver alguma condição de saúde, usar medicamentos, estiver grávida ou amamentando.</p>
+      <p class="small muted">A "Nutri Rigorosa" é exigente para te manter no foco, mas a ideia é progresso, não perfeição.</p>
+      <button class="btn btn-or btn-lg btn-block" onClick=${ok}>Entendi</button>
+    </div>
+  <//>`;
 }
 
 // ---------------------------------------------------------------------
@@ -771,10 +1072,11 @@ function WeekChart({ meals, goal }) {
 }
 
 function MealRow({ meal, onClick, showDate }) {
+  const img = mealImg(meal);
   return html`<button class="meal" onClick=${onClick}>
-    <div class="thumb">${meal.imageUrl ? html`<img src=${meal.imageUrl} alt="" loading="lazy" />` : html`<${Icon} n="utensils" s=${24} />`}</div>
+    <div class="thumb">${img ? html`<img src=${img} alt="" loading="lazy" />` : html`<${Icon} n="utensils" s=${24} />`}</div>
     <div class="grow">
-      <div class="row" style="gap:6px"><span class="tag">${hhmm(meal.timestamp)}</span>${showDate && html`<span class="tiny muted2 b">${fmtDate(meal.timestamp, { day: "numeric", month: "short" })}</span>`}</div>
+      <div class="row" style="gap:6px;flex-wrap:wrap"><span class="tag">${hhmm(meal.timestamp)}</span>${meal.mealType && html`<span class="tiny muted2 b">${meal.mealType}</span>`}${showDate && html`<span class="tiny muted2 b">· ${fmtDate(meal.timestamp, { day: "numeric", month: "short" })}</span>`}</div>
       <div class="b trunc" style="font-size:16px;margin-top:4px">${meal.foodName || "Refeição"}</div>
       <div class="tiny muted b num" style="margin-top:2px"><span style="color:#0f172a;font-size:14px">${int(meal.calories)}</span> kcal · P ${int(meal.protein)}g · C ${int(meal.carbs)}g · G ${int(meal.fat)}g</div>
     </div>
@@ -782,7 +1084,7 @@ function MealRow({ meal, onClick, showDate }) {
   </button>`;
 }
 
-function Dashboard({ user, profile, meals, water, plan, go, openMeal, openHistory }) {
+function Dashboard({ user, profile, aiState, meals, water, plan, weights, go, openMeal, openHistory, openWeight }) {
   const goal = int(profile.dailyCalorieGoal) || calcGoals(profile).kcal;
   const waterGoal = int(profile.waterGoalMl) || calcGoals(profile).waterMl;
   const today = meals.filter((m) => isToday(m.timestamp));
@@ -797,7 +1099,8 @@ function Dashboard({ user, profile, meals, water, plan, go, openMeal, openHistor
 
   // ---- Feedback da Nutri: gerado só quando as refeições do dia mudam, e salvo no perfil ----
   const fbKey = dayKey() + "|" + today.map((m) => `${m.id}:${int(m.calories)}`).sort().join(",");
-  const saved = profile.feedback && profile.feedback.date === dayKey() ? profile.feedback : null;
+  const fbSrc = aiState?.feedback || profile.feedback;
+  const saved = fbSrc && fbSrc.date === dayKey() ? fbSrc : null;
   const [fbBusy, setFbBusy] = useState(false);
   const [fbErr, setFbErr] = useState(null);
   const tried = useRef(null);
@@ -808,11 +1111,15 @@ function Dashboard({ user, profile, meals, water, plan, go, openMeal, openHistor
     setFbBusy(true); setFbErr(null);
     try {
       const r = await ai("dailyFeedback", {
-        profile: profileForAI({ ...profile, dailyCalorieGoal: goal }), waterMl: waterToday,
+        profile: profileForAI({ ...profile, dailyCalorieGoal: goal }), waterMl: waterToday, waterGoalMl: waterGoal, now: hhmm(new Date().toISOString()),
         meals: today.map((m) => ({ foodName: m.foodName, calories: m.calories, protein: m.protein, carbs: m.carbs, fat: m.fat, time: hhmm(m.timestamp) })),
       });
       const text = str(r?.feedback, 900);
-      if (text) await setDoc(doc(db, "users", user.uid), { uid: user.uid, feedback: { date: dayKey(), key: fbKey, text, at: new Date().toISOString() } }, { merge: true });
+      if (text) {
+        const fb = { date: dayKey(), key: fbKey, text, at: new Date().toISOString() };
+        try { await setDoc(doc(db, "aiState", user.uid), { uid: user.uid, feedback: fb }, { merge: true }); }
+        catch { await setDoc(doc(db, "users", user.uid), { uid: user.uid, feedback: fb }, { merge: true }); }
+      }
     } catch (e) { setFbErr(e.message); }
     finally { setFbBusy(false); }
   }, [fbKey, saved?.key]);
@@ -824,6 +1131,13 @@ function Dashboard({ user, profile, meals, water, plan, go, openMeal, openHistor
     catch (e) { toast("Não foi possível registrar a água.", "err"); }
   };
 
+  const [dismissed, setDismissed] = useState(() => store.get("dismissed", []));
+  const reminders = computeReminders({ profile, meals, water, plan, weights }).filter((r) => !dismissed.includes(r.id));
+  const dismiss = (id) => { const next = [...dismissed, id].slice(-60); setDismissed(next); store.set("dismissed", next); };
+  const lastW = weights.length ? weights[weights.length - 1] : null;
+  const firstW = weights.length ? weights[0] : null;
+  const wDiff = lastW && firstW ? Math.round((num(lastW.weight) - num(firstW.weight)) * 10) / 10 : 0;
+
   const status = pct > 105 ? ["Limite excedido!", "rd"] : pct >= 85 ? ["Na medida certa", "gr"] : ["Dentro da meta", "or"];
 
   return html`<div class="stack-lg anim">
@@ -834,6 +1148,15 @@ function Dashboard({ user, profile, meals, water, plan, go, openMeal, openHistor
       </div>
       <div class="chip" style="background:#fff;padding:9px 14px"><${Icon} n="calendar" s=${15} c="or" />${cap(fmtDate(new Date().toISOString(), { weekday: "long", day: "numeric", month: "long" }))}</div>
     </div>
+
+    ${reminders.length > 0 && html`<div class="stack" style="gap:10px">${reminders.map((r) => html`<div class="banner" key=${r.id}>
+      <div class="icon-box ib-or" style="width:38px;height:38px;border-radius:12px"><${Icon} n=${r.icon} s=${18} /></div>
+      <div class="grow"><div class="b small">${r.title}</div><div class="tiny muted">${r.text}</div></div>
+      ${r.action === "agua" ? html`<button class="btn btn-bl btn-sm act" onClick=${() => addWater(250)}>+250 ml</button>`
+        : r.action === "plano" ? html`<button class="btn btn-dark btn-sm act" onClick=${() => go("plano")}>Ver plano</button>`
+        : r.action === "peso" ? html`<button class="btn btn-dark btn-sm act" onClick=${openWeight}>Registrar</button>` : null}
+      <button class="icon-btn x" onClick=${() => dismiss(r.id)} aria-label="Dispensar aviso"><${Icon} n="x" s=${15} /></button>
+    </div>`)}</div>`}
 
     <div class="main-grid">
       <div class="stack-lg">
@@ -904,6 +1227,12 @@ function Dashboard({ user, profile, meals, water, plan, go, openMeal, openHistor
           <div class="card tight"><div class="icon-box ib-or" style="margin-bottom:10px"><${Icon} n="utensils" s=${20} /></div><div class="eyebrow">Refeições</div><div class="h2 num">${today.length}</div></div>
           <div class="card tight"><div class="icon-box ib-gr" style="margin-bottom:10px"><${Icon} n="trending" s=${20} /></div><div class="eyebrow">Proteína</div><div class="h2 num">${P}g</div></div>
         </div>
+        <div class="card tight">
+          <div class="between"><div class="row" style="gap:10px"><div class="icon-box ib-or"><${Icon} n="scale" s=${20} /></div><div><div class="eyebrow">Peso atual</div><div class="h2 num">${fmtKg(lastW ? lastW.weight : profile.weight)}<span class="tiny muted2"> kg</span></div></div></div>
+            <button class="btn btn-soft btn-sm" onClick=${openWeight}><${Icon} n="plus" s=${15} />Pesar</button></div>
+          <div class="tiny b muted" style="margin-top:8px">${weights.length > 1 ? html`<span class=${wDiff < 0 ? "gr" : wDiff > 0 ? "rd" : ""}>${wDiff > 0 ? "▲ +" : wDiff < 0 ? "▼ " : ""}${fmtKg(wDiff)} kg</span> desde ${fmtDate(firstW.timestamp, { day: "numeric", month: "short" })}` : lastW ? `Última pesagem: ${fmtDate(lastW.timestamp, { day: "numeric", month: "short" })}` : "Registre seu peso para acompanhar a evolução"}${num(profile.targetWeight) ? ` · meta ${fmtKg(profile.targetWeight)} kg` : ""}</div>
+          <button class="link tiny" style="margin-top:6px" onClick=${() => go("perfil")}>Ver evolução <${Icon} n="arrow" s=${13} /></button>
+        </div>
         <button class="btn btn-dark btn-lg btn-block" onClick=${() => go("analisar")}><${Icon} n="camera" />Registrar refeição</button>
       </div>
     </div>
@@ -924,49 +1253,64 @@ function Dashboard({ user, profile, meals, water, plan, go, openMeal, openHistor
 }
 
 // ---- Modal de refeição: ver / editar / excluir / repetir ----
-function MealModal({ meal, user, onClose }) {
+function MealModal({ meal, user, meals, onClose }) {
   const [edit, setEdit] = useState(false);
-  const [f, setF] = useState({ ...meal });
+  const [f, setF] = useState(() => ({ foodName: meal.foodName || "", calories: meal.calories, protein: meal.protein, carbs: meal.carbs, fat: meal.fat, items: Array.isArray(meal.items) && meal.items.length ? meal.items : null }));
   const [busy, setBusy] = useState(false);
+  const [photo, setPhoto] = useState(meal.imageUrl || null);
+  useEffect(() => {
+    if (meal.imageUrl || !meal.photoId) return;
+    getDoc(doc(db, "mealPhotos", meal.photoId)).then((s) => s.exists() && setPhoto(s.data().data)).catch(() => {});
+  }, [meal.photoId]);
+  const shown = photo || meal.thumb;
   const setN = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const totals = f.items ? sumItems(f.items) : null;
 
   const save = async () => {
     setBusy(true);
     try {
-      await updateDoc(doc(db, "meals", meal.id), { foodName: str(f.foodName, 80) || "Refeição", calories: int(f.calories), protein: int(f.protein), carbs: int(f.carbs), fat: int(f.fat) });
+      const base = { foodName: str(f.foodName, 80) || "Refeição" };
+      const data = f.items ? { ...base, ...sumItems(f.items), items: itemsForDb(f.items) } : { ...base, calories: int(f.calories), protein: int(f.protein), carbs: int(f.carbs), fat: int(f.fat) };
+      await updateDoc(doc(db, "meals", meal.id), clean(data));
       toast("Refeição atualizada!"); onClose();
     } catch (e) { toast("Não foi possível salvar.", "err"); } finally { setBusy(false); }
   };
   const del = async () => {
     if (!(await confirmAsk({ title: "Excluir refeição?", text: `"${meal.foodName}" será removida do seu diário.`, ok: "Excluir", danger: true }))) return;
-    try { await deleteDoc(doc(db, "meals", meal.id)); toast("Refeição excluída."); onClose(); }
-    catch (e) { toast("Não foi possível excluir.", "err"); }
+    try {
+      await deleteDoc(doc(db, "meals", meal.id));
+      if (meal.photoId && !meals.some((m) => m.id !== meal.id && m.photoId === meal.photoId)) deleteDoc(doc(db, "mealPhotos", meal.photoId)).catch(() => {});
+      toast("Refeição excluída."); onClose();
+    } catch (e) { toast("Não foi possível excluir.", "err"); }
   };
   const repeat = async () => {
     setBusy(true);
     try {
       await addDoc(collection(db, "meals"), clean({
         uid: user.uid, foodName: meal.foodName, calories: int(meal.calories), protein: int(meal.protein), carbs: int(meal.carbs), fat: int(meal.fat),
-        analysis: meal.analysis || "", imageUrl: meal.imageUrl || null, textDescription: meal.textDescription || null, source: "repeat",
-        timestamp: new Date().toISOString(),
+        items: meal.items || null, analysis: meal.analysis || "", imageUrl: meal.imageUrl || null, photoId: meal.photoId || null, thumb: meal.thumb || null,
+        textDescription: meal.textDescription || null, source: "repeat", mealType: mealTypeFor(), timestamp: new Date().toISOString(),
       }));
       toast("Registrado de novo agora!"); onClose();
     } catch (e) { toast("Não foi possível registrar.", "err"); } finally { setBusy(false); }
   };
 
-  const hero = html`<div class="modal-hero" style=${meal.imageUrl ? null : { height: "130px" }}>
-    ${meal.imageUrl && html`<img src=${meal.imageUrl} alt="" />`}
+  const hero = html`<div class="modal-hero" style=${shown ? null : { height: "130px" }}>
+    ${shown && html`<img src=${shown} alt="" />`}
     <button class="icon-btn close" onClick=${onClose} aria-label="Fechar"><${Icon} n="x" /></button>
-    <div class="ov"><div class="h2">${edit ? "Editar refeição" : meal.foodName}</div><div class="tiny b" style="opacity:.7;text-transform:uppercase;letter-spacing:.1em">${fmtDate(meal.timestamp, { day: "numeric", month: "long" })} às ${hhmm(meal.timestamp)}</div></div>
+    <div class="ov"><div class="h2">${edit ? "Editar refeição" : meal.foodName}</div><div class="tiny b" style="opacity:.7;text-transform:uppercase;letter-spacing:.1em">${meal.mealType ? meal.mealType + " · " : ""}${fmtDate(meal.timestamp, { day: "numeric", month: "long" })} às ${hhmm(meal.timestamp)}</div></div>
   </div>`;
 
   return html`<${Modal} onClose=${onClose} hero=${hero}>
     ${edit
       ? html`<div class="stack">
           <div><label class="label">Nome</label><input class="input" value=${f.foodName} onInput=${setN("foodName")} /></div>
-          <div class="grid2">
-            ${[["calories", "Calorias (kcal)"], ["protein", "Proteínas (g)"], ["carbs", "Carboidratos (g)"], ["fat", "Gorduras (g)"]].map(([k, l]) => html`<div><label class="label">${l}</label><input class="input" type="number" inputmode="numeric" min="0" value=${f[k]} onInput=${setN(k)} /></div>`)}
-          </div>
+          ${f.items
+            ? html`<div class="label" style="margin-bottom:0">Itens e quantidades</div><${ItemsEditor} items=${f.items} onChange=${(items) => setF({ ...f, items })} />
+                   <div class="grid4"><${MacroTile} label="Kcal" value=${totals.calories} unit="" /><${MacroTile} label="Prot" value=${totals.protein} color="or" /><${MacroTile} label="Carb" value=${totals.carbs} color="bl" /><${MacroTile} label="Gord" value=${totals.fat} color="gr" /></div>`
+            : html`<div class="grid2">
+                ${[["calories", "Calorias (kcal)"], ["protein", "Proteínas (g)"], ["carbs", "Carboidratos (g)"], ["fat", "Gorduras (g)"]].map(([k, l]) => html`<div><label class="label">${l}</label><input class="input" type="number" inputmode="numeric" min="0" value=${f[k]} onInput=${setN(k)} /></div>`)}
+              </div>`}
           <div class="grid2"><button class="btn btn-soft" onClick=${() => setEdit(false)}><${Icon} n="x" s=${18} />Cancelar</button><button class="btn btn-gr" disabled=${busy} onClick=${save}>${busy ? html`<${Spinner} />` : html`<${Icon} n="save" s=${18} />Salvar`}</button></div>
         </div>`
       : html`<div class="stack">
@@ -976,6 +1320,10 @@ function MealModal({ meal, user, onClose }) {
             <${MacroTile} label="Carb" value=${int(meal.carbs)} color="bl" />
             <${MacroTile} label="Gord" value=${int(meal.fat)} color="gr" />
           </div>
+          ${Array.isArray(meal.items) && meal.items.length > 0 && html`<div class="stack" style="gap:4px">
+            <div class="eyebrow">Itens</div>
+            ${meal.items.map((it, i) => html`<div class="between small" key=${i} style="padding:6px 0;border-bottom:1px solid #f1f4f8"><span>${it.name} <span class="muted2">· ${int(it.grams)} g</span></span><b class="num">${int(it.kcal)} kcal</b></div>`)}
+          </div>`}
           ${meal.textDescription && html`<div class="tile small"><span class="eyebrow">Você descreveu</span><div style="margin-top:2px">${meal.textDescription}</div></div>`}
           ${meal.analysis && html`<div class="card-or"><div class="row b or tiny" style="text-transform:uppercase;letter-spacing:.1em;gap:6px"><${Icon} n="zap" s=${15} />Nutri Rigorosa</div><p class="quote" style="margin-top:6px;font-size:15px">“${meal.analysis}”</p></div>`}
           <div class="grid3">
@@ -1051,8 +1399,10 @@ function Analyze({ user, profile, meals, go }) {
   const [image, setImage] = useState(null);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [err, setErr] = useState(null);
-  const [result, setResult] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [saved, setSaved] = useState(null);
   const [cam, setCam] = useState(false);
   const fileRef = useRef(null), capRef = useRef(null);
 
@@ -1065,67 +1415,90 @@ function Analyze({ user, profile, meals, go }) {
   const onFile = async (e) => {
     const file = e.target.files?.[0]; e.target.value = "";
     if (!file) return;
-    try { setImage(await compressImage(file)); setResult(null); setErr(null); } catch (ex) { setErr(ex.message); }
+    try { setImage(await compressImage(file, 640, 0.6)); setDraft(null); setSaved(null); setErr(null); } catch (ex) { setErr(ex.message); }
   };
   const openCamera = () => (isTouch() ? capRef.current?.click() : setCam(true));
-  const reset = () => { setImage(null); setText(""); setResult(null); setErr(null); };
+  const reset = () => { setImage(null); setText(""); setDraft(null); setSaved(null); setErr(null); };
 
   const analyze = async () => {
     if (!image && !text.trim()) return;
     setBusy(true); setErr(null);
     try {
       const prof = profileForAI(profile);
-      const r = normalizeMeal(image ? await ai("analyzeImage", { image, note: text.trim(), profile: prof }) : await ai("analyzeText", { text: text.trim(), profile: prof }));
-      const ref = await addDoc(collection(db, "meals"), clean({
-        uid: user.uid, ...r, imageUrl: image || null, textDescription: text.trim() || null,
-        source: image ? "photo" : "text", timestamp: new Date().toISOString(),
-      }));
-      setResult({ ...r, id: ref.id });
+      const r = image ? await ai("analyzeImage", { image, note: text.trim(), profile: prof }) : await ai("analyzeText", { text: text.trim(), profile: prof });
+      setDraft(normalizeDraft(r));
+    } catch (e) { console.error(e); setErr(e.message || "Falha ao analisar. Tente novamente."); }
+    finally { setBusy(false); }
+  };
+
+  const save = async () => {
+    if (!draft?.items?.length) return;
+    setSaving(true);
+    try {
+      const totals = sumItems(draft.items);
+      await saveMeal(user, {
+        foodName: str(draft.foodName, 80) || "Refeição", ...totals, items: itemsForDb(draft.items), analysis: draft.analysis,
+        textDescription: text.trim() || null, source: image ? "photo" : "text",
+      }, { image });
+      setSaved({ ...draft, ...totals });
+      setDraft(null);
       toast("Refeição registrada no diário!");
-    } catch (e) {
-      console.error(e);
-      setErr(e.message || "Falha ao analisar. Tente novamente.");
-    } finally { setBusy(false); }
+    } catch (e) { console.error(e); toast("Não foi possível salvar. Tente de novo.", "err"); }
+    finally { setSaving(false); }
   };
 
   const relog = async (m) => {
     if (!(await confirmAsk({ title: "Registrar de novo?", text: `${m.foodName} · ${int(m.calories)} kcal será registrado agora, sem gastar IA.`, ok: "Registrar" }))) return;
     try {
-      await addDoc(collection(db, "meals"), clean({ uid: user.uid, foodName: m.foodName, calories: int(m.calories), protein: int(m.protein), carbs: int(m.carbs), fat: int(m.fat), analysis: m.analysis || "", imageUrl: m.imageUrl || null, textDescription: m.textDescription || null, source: "repeat", timestamp: new Date().toISOString() }));
+      await addDoc(collection(db, "meals"), clean({ uid: user.uid, foodName: m.foodName, calories: int(m.calories), protein: int(m.protein), carbs: int(m.carbs), fat: int(m.fat), items: m.items || null, analysis: m.analysis || "", imageUrl: m.imageUrl || null, photoId: m.photoId || null, thumb: m.thumb || null, textDescription: m.textDescription || null, source: "repeat", mealType: mealTypeFor(), timestamp: new Date().toISOString() }));
       toast("Registrado!"); go("resumo");
     } catch (e) { toast("Não foi possível registrar.", "err"); }
   };
 
-  return html`<div class="anim" style="max-width:560px;margin:0 auto">
+  const totals = draft ? sumItems(draft.items) : null;
+
+  return html`<div class="anim" style="max-width:600px;margin:0 auto">
     <input type="file" accept="image/*" ref=${fileRef} onChange=${onFile} hidden />
     <input type="file" accept="image/*" capture="environment" ref=${capRef} onChange=${onFile} hidden />
-    ${cam && html`<${CameraModal} onCapture=${(d) => { setImage(d); setResult(null); setErr(null); }} onClose=${() => setCam(false)} />`}
+    ${cam && html`<${CameraModal} onCapture=${(d) => { setImage(d); setDraft(null); setSaved(null); setErr(null); }} onClose=${() => setCam(false)} />`}
 
     <div class="card stack-lg">
       <div class="between">
-        <div><div class="h2">Analisar Refeição</div><div class="small muted2">Foto ou descrição · a IA estima calorias e macros</div></div>
-        ${(image || text || result) && html`<button class="icon-btn" title="Recomeçar" onClick=${reset}><${Icon} n="refresh" s=${19} /></button>`}
+        <div><div class="h2">Analisar Refeição</div><div class="small muted2">Foto ou descrição · você confere antes de salvar</div></div>
+        ${(image || text || draft || saved) && html`<button class="icon-btn" title="Recomeçar" onClick=${reset}><${Icon} n="refresh" s=${19} /></button>`}
       </div>
 
-      ${result ? html`
+      ${saved ? html`
         <div class="card-gr stack" style="padding:20px">
-          <div class="row b gr"><div class="icon-box" style="background:var(--gr);color:#fff;width:34px;height:34px;border-radius:10px"><${Icon} n="check" s=${18} /></div>Análise concluída e salva!</div>
+          <div class="row b gr"><div class="icon-box" style="background:var(--gr);color:#fff;width:34px;height:34px;border-radius:10px"><${Icon} n="check" s=${18} /></div>Salvo no seu diário!</div>
           ${image && html`<div class="photo" style="aspect-ratio:16/9"><img src=${image} alt="" /></div>`}
-          <div><div class="eyebrow">Alimento</div><div class="h2">${result.foodName}</div></div>
+          <div><div class="eyebrow">Refeição</div><div class="h2">${saved.foodName}</div></div>
           <div class="grid4">
-            <${MacroTile} label="Kcal" value=${result.calories} unit="" />
-            <${MacroTile} label="Prot" value=${result.protein} color="or" />
-            <${MacroTile} label="Carb" value=${result.carbs} color="bl" />
-            <${MacroTile} label="Gord" value=${result.fat} color="gr" />
+            <${MacroTile} label="Kcal" value=${saved.calories} unit="" /><${MacroTile} label="Prot" value=${saved.protein} color="or" /><${MacroTile} label="Carb" value=${saved.carbs} color="bl" /><${MacroTile} label="Gord" value=${saved.fat} color="gr" />
           </div>
-          ${result.analysis && html`<div style="background:rgba(255,255,255,.7);border-radius:14px;padding:14px" class="small"><b class="gr">Nutri Rigorosa: </b>“${result.analysis}”</div>`}
-          <p class="tiny muted">Valores estimados. Se algo estiver errado, ajuste em Resumo → toque na refeição → Editar.</p>
+          ${saved.analysis && html`<div style="background:rgba(255,255,255,.7);border-radius:14px;padding:14px" class="small"><b class="gr">Nutri Rigorosa: </b>“${saved.analysis}”</div>`}
         </div>
         <div class="grid2"><button class="btn btn-soft" onClick=${reset}><${Icon} n="plus" s=${18} />Outra refeição</button><button class="btn btn-dark" onClick=${() => go("resumo")}>Ver resumo<${Icon} n="arrow" s=${18} /></button></div>
+      ` : draft ? html`
+        <div class="stack">
+          ${image && html`<div class="photo" style="aspect-ratio:16/9"><img src=${image} alt="" /></div>`}
+          <div class="note" style="align-items:center"><${Icon} n="edit" s=${18} /><div><b>Confira antes de salvar.</b> Ajuste as quantidades: as calorias se recalculam na hora.</div></div>
+          <div><label class="label">Nome da refeição</label><input class="input" value=${draft.foodName} onInput=${(e) => setDraft({ ...draft, foodName: e.target.value })} /></div>
+          <${ItemsEditor} items=${draft.items} onChange=${(items) => setDraft({ ...draft, items })} />
+          <div class="grid4">
+            <${MacroTile} label="Kcal" value=${totals.calories} unit="" /><${MacroTile} label="Prot" value=${totals.protein} color="or" /><${MacroTile} label="Carb" value=${totals.carbs} color="bl" /><${MacroTile} label="Gord" value=${totals.fat} color="gr" />
+          </div>
+          ${draft.analysis && html`<div class="card-or small"><b class="or">Nutri Rigorosa: </b>“${draft.analysis}”</div>`}
+          <p class="tiny muted">Itens marcados "Tabela TACO" usam valores de referência da Tabela Brasileira de Composição de Alimentos; os demais são estimativas da IA.</p>
+          <div class="grid2">
+            <button class="btn btn-soft" onClick=${() => setDraft(null)}><${Icon} n="x" s=${18} />Descartar</button>
+            <button class="btn btn-or" disabled=${saving || !draft.items.length} onClick=${save}>${saving ? html`<${Spinner} />` : html`<${Icon} n="check" s=${18} />Salvar no diário`}</button>
+          </div>
+        </div>
       ` : html`
         ${image
           ? html`<div class="photo"><img src=${image} alt="Foto da refeição" />
-              ${busy ? html`<div class="scan"><${Spinner} s=${36} c="or" />Escaneando macros...</div>`
+              ${busy ? html`<div class="scan"><${Spinner} s=${36} c="or" />Identificando os alimentos...</div>`
                 : html`<button class="icon-btn" style="position:absolute;top:10px;right:10px;background:rgba(15,23,42,.6);color:#fff" onClick=${() => setImage(null)} aria-label="Remover foto"><${Icon} n="x" /></button>`}</div>`
           : html`<div class="grid2">
               <button class="pick" onClick=${openCamera}><div class="icon-box ib-or" style="width:56px;height:56px;border-radius:18px"><${Icon} n="camera" s=${26} /></div><div class="b">Tirar Foto</div><div class="eyebrow">Câmera</div></button>
@@ -1133,9 +1506,10 @@ function Analyze({ user, profile, meals, go }) {
             </div>
             <div class="divider">ou descreva</div>`}
         <div>
-          ${image && html`<label class="label"><${Icon} n="message" s=${13} />Detalhes (opcional)</label>`}
+          ${image && html`<label class="label"><${Icon} n="message" s=${13} />Detalhes (opcional, melhora a precisão)</label>`}
           <textarea class="input" value=${text} onInput=${(e) => setText(e.target.value)} maxlength="600"
-            placeholder=${image ? "Ex: arroz integral, 150g de frango, sem óleo..." : "Ex: Comi 2 ovos mexidos com 1 fatia de pão integral e café sem açúcar..."}></textarea>
+            placeholder=${image ? "Ex: 4 colheres de arroz, 1 concha de feijão, 150g de frango..." : "Ex: 2 ovos mexidos, 1 pão francês com manteiga e café com leite sem açúcar"}></textarea>
+          ${!image && html`<p class="tiny muted" style="margin-top:6px">Dica: informe as quantidades (colheres, unidades, gramas) para um resultado mais preciso.</p>`}
         </div>
         ${err && html`<div class="err"><${Icon} n="alert" s=${18} /><div>${err}</div></div>`}
         <button class="btn btn-dark btn-lg btn-block" disabled=${busy || (!image && !text.trim())} onClick=${analyze}>
@@ -1144,7 +1518,7 @@ function Analyze({ user, profile, meals, go }) {
       `}
     </div>
 
-    ${!result && recents.length > 0 && html`<div class="card" style="margin-top:20px">
+    ${!saved && !draft && recents.length > 0 && html`<div class="card" style="margin-top:20px">
       <div class="h3">Comeu de novo?</div>
       <div class="small muted2" style="margin-bottom:12px">Registre com um toque, sem esperar a IA.</div>
       <div class="wrap-row">${recents.map((m) => html`<button class="chip" onClick=${() => relog(m)}><${Icon} n="plus" s=${14} c="or" />${m.foodName} <span class="muted2">· ${int(m.calories)}</span></button>`)}</div>
@@ -1155,33 +1529,61 @@ function Analyze({ user, profile, meals, go }) {
 // ---------------------------------------------------------------------
 // Plano alimentar
 // ---------------------------------------------------------------------
-function PlanView({ user, profile, plan, go }) {
+// Opções de uma refeição do plano (compatível com planos antigos, que só tinham "suggestions")
+function planOptions(meal, plan) {
+  if (Array.isArray(meal.options) && meal.options.length) return meal.options;
+  // Planos antigos não tinham calorias por refeição: distribui a meta do dia pelo peso típico de cada refeição
+  const share = (nm) => { const k = normKey(nm); return k.includes("almoco") ? 0.32 : k.includes("jantar") ? 0.26 : k.includes("cafe") ? 0.22 : k.includes("ceia") ? 0.08 : 0.1; };
+  const totalShare = plan.meals.reduce((a, m) => a + share(m.name), 0) || 1;
+  const kcal = int(meal.calories) || Math.round((num(plan.dailyCalories) * share(meal.name)) / totalShare);
+  const P = num(plan.macros?.protein), C = num(plan.macros?.carbs), G = num(plan.macros?.fat);
+  const tot = P * 4 + C * 4 + G * 9 || 1;
+  const part = (g, k) => Math.round((kcal * (g * k / tot)) / k);
+  return (meal.suggestions || []).map((t) => ({ text: t, kcal, protein: part(P, 4), carbs: part(C, 4), fat: part(G, 9) }));
+}
+
+function PlanView({ user, profile, plan, meals, go }) {
   const [busy, setBusy] = useState(false);
+  const [logging, setLogging] = useState(null);
   const [err, setErr] = useState(null);
   const goal = int(profile.dailyCalorieGoal) || calcGoals(profile).kcal;
   const valid = plan && Array.isArray(plan.meals) && plan.meals.length > 0;
   const outdated = valid && Math.abs(num(plan.dailyCalories) - goal) > goal * 0.03;
+  const today = meals.filter((m) => isToday(m.timestamp));
+  const doy = dayOfYear();
 
   const generate = async () => {
-    if (valid && !(await confirmAsk({ title: "Gerar um novo plano?", text: "A IA vai criar um plano novo com base no seu perfil atual. O plano atual fica guardado no histórico.", ok: "Gerar plano" }))) return;
+    if (valid && !(await confirmAsk({ title: "Gerar um novo plano?", text: "A IA vai criar um plano novo com base no seu perfil atual. O plano atual continua guardado.", ok: "Gerar plano" }))) return;
     setBusy(true); setErr(null);
     try {
       const r = await ai("dietPlan", { profile: profileForAI({ ...profile, dailyCalorieGoal: goal }) });
-      const meals = (Array.isArray(r?.meals) ? r.meals : []).slice(0, 8).map((m) => ({
-        name: str(m?.name || "Refeição", 40), time: str(m?.time || "", 5), calories: int(m?.calories), suggestions: strList(m?.suggestions, 4),
-      })).filter((m) => m.suggestions.length);
-      if (!meals.length) throw new Error("A IA não retornou refeições. Tente novamente.");
+      const mealsOut = (Array.isArray(r?.meals) ? r.meals : []).slice(0, 8).map((m) => {
+        const options = (Array.isArray(m?.options) ? m.options : []).slice(0, 4).map((o) => ({ text: str(o?.text, 220), kcal: int(o?.kcal), protein: int(o?.protein), carbs: int(o?.carbs), fat: int(o?.fat) })).filter((o) => o.text);
+        return { name: str(m?.name || "Refeição", 40), time: str(m?.time || "", 5), calories: int(m?.calories), options, suggestions: options.map((o) => o.text) };
+      }).filter((m) => m.options.length);
+      if (!mealsOut.length) throw new Error("A IA não retornou refeições. Tente novamente.");
       await addDoc(collection(db, "dietPlans"), clean({
         uid: user.uid, dailyCalories: goal,
         macros: { protein: int(r?.macros?.protein), carbs: int(r?.macros?.carbs), fat: int(r?.macros?.fat) },
-        meals, tips: strList(r?.tips, 6), createdAt: new Date().toISOString(),
+        meals: mealsOut, tips: strList(r?.tips, 6), createdAt: new Date().toISOString(),
       }));
       toast("Plano novo pronto!");
     } catch (e) { console.error(e); setErr(e.message); } finally { setBusy(false); }
   };
 
-  const macroVal = (v) => int(v);
-  const mTotal = valid ? macroVal(plan.macros?.protein) * 4 + macroVal(plan.macros?.carbs) * 4 + macroVal(plan.macros?.fat) * 9 : 0;
+  const ate = async (meal, opt, key) => {
+    setLogging(key);
+    try {
+      await addDoc(collection(db, "meals"), clean({
+        uid: user.uid, foodName: str(`${meal.name}: ${opt.text}`, 80), calories: int(opt.kcal), protein: int(opt.protein), carbs: int(opt.carbs), fat: int(opt.fat),
+        analysis: "Seguiu o plano alimentar. É assim que se faz!", textDescription: opt.text, imageUrl: null, source: "plan", mealType: meal.name, planMeal: meal.name,
+        timestamp: new Date().toISOString(),
+      }));
+      toast(`${meal.name} registrado!`);
+    } catch (e) { toast("Não foi possível registrar.", "err"); } finally { setLogging(null); }
+  };
+
+  const mTotal = valid ? int(plan.macros?.protein) * 4 + int(plan.macros?.carbs) * 4 + int(plan.macros?.fat) * 9 : 0;
 
   return html`<div class="stack-lg anim">
     <div class="between" style="flex-wrap:wrap;gap:14px">
@@ -1196,7 +1598,7 @@ function PlanView({ user, profile, plan, go }) {
       ? html`<div class="card center stack" style="align-items:center;padding:44px 24px">
           <div class="icon-box ib-or" style="width:76px;height:76px;border-radius:26px"><${Icon} n="sparkles" s=${34} /></div>
           <div class="h2">Sua jornada começa aqui</div>
-          <p class="muted" style="max-width:380px">A IA usa seu perfil (meta de ${goal} kcal${profile.restrictions?.length ? ", sem " + profile.restrictions.join(", ").toLowerCase() : ""}) para montar um plano realista com comida do dia a dia.</p>
+          <p class="muted" style="max-width:400px">A IA usa seu perfil (meta de ${goal} kcal${profile.restrictions?.length ? ", sem " + profile.restrictions.join(", ").toLowerCase() : ""}) para montar um plano da semana, com 3 opções por refeição para variar.</p>
           <button class="btn btn-or btn-lg" disabled=${busy} onClick=${generate}>${busy ? html`<${Spinner} />Montando seu plano...` : html`<${Icon} n="sparkles" />Criar meu plano agora`}</button>
         </div>`
       : html`<div class="side-grid">
@@ -1205,31 +1607,43 @@ function PlanView({ user, profile, plan, go }) {
               <div><div class="eyebrow">Meta diária</div><div class="row" style="align-items:baseline;gap:6px"><span class="num" style="font-size:46px;font-weight:800;letter-spacing:-.04em">${int(plan.dailyCalories)}</span><span class="b or">kcal</span></div></div>
               <div class="eyebrow">Distribuição de macros</div>
               ${[["Proteína", plan.macros?.protein, 4, "or"], ["Carboidratos", plan.macros?.carbs, 4, "bl"], ["Gorduras", plan.macros?.fat, 9, "gr"]].map(([l, v, k, c]) => html`<div>
-                <div class="between tiny b" style="text-transform:uppercase;letter-spacing:.08em"><span>${l}</span><span class="num">${macroVal(v)}g</span></div>
-                <div class="bar" style="height:6px;margin-top:6px"><i class=${c} style=${{ width: mTotal ? Math.round((macroVal(v) * k / mTotal) * 100) + "%" : "0%" }}></i></div></div>`)}
+                <div class="between tiny b" style="text-transform:uppercase;letter-spacing:.08em"><span>${l}</span><span class="num">${int(v)}g</span></div>
+                <div class="bar" style="height:6px;margin-top:6px"><i class=${c} style=${{ width: mTotal ? Math.round((int(v) * k / mTotal) * 100) + "%" : "0%" }}></i></div></div>`)}
             </div>
             ${plan.tips?.length > 0 && html`<div class="card stack">
               <div class="row h3"><${Icon} n="shield" s=${20} />Regras da Nutri</div>
-              ${plan.tips.map((t) => html`<div class="row small" style="align-items:flex-start;gap:10px"><${Icon} n="check" s=${18} c="gr" /><span class="muted" style="color:#475569">${t}</span></div>`)}
+              ${plan.tips.map((t) => html`<div class="row small" style="align-items:flex-start;gap:10px"><${Icon} n="check" s=${18} c="gr" /><span style="color:#475569">${t}</span></div>`)}
             </div>`}
+            <div class="grid2">
+              <button class="btn btn-soft" onClick=${() => go("cozinha", "compras")}><${Icon} n="cart" s=${18} />Compras</button>
+              <button class="btn btn-soft" onClick=${() => go("cozinha", "receitas")}><${Icon} n="chef" s=${18} />Receitas</button>
+            </div>
           </div>
           <div class="stack">
-            <div class="between"><div class="h2">Estrutura de Refeições</div><span class="chip"><${Icon} n="calendar" s=${14} />${plan.createdAt ? fmtDate(plan.createdAt, { day: "2-digit", month: "2-digit", year: "numeric" }) : ""}</span></div>
-            ${plan.meals.map((m, i) => html`<div class="card tight" key=${i}>
-              <div class="row" style="align-items:flex-start;gap:14px">
-                <div class="icon-box ib-soft"><${Icon} n="clock" s=${20} /></div>
-                <div class="grow">
-                  <div class="row" style="gap:8px;flex-wrap:wrap">${m.time && html`<span class="tag">${m.time}</span>`}<span class="h3">${m.name}</span>${int(m.calories) > 0 && html`<span class="tiny b muted2 num" style="margin-left:auto">${int(m.calories)} kcal</span>`}</div>
-                  <div class="stack" style="gap:6px;margin-top:10px">
-                    ${(m.suggestions || []).map((sug, j) => html`<div class="small" style="display:flex;gap:8px;align-items:flex-start"><span class="tag soft" style="flex-shrink:0;margin-top:1px">${j === 0 ? "Opção A" : j === 1 ? "Opção B" : "Opção " + (j + 1)}</span><span style="color:#334155">${sug}</span></div>`)}
-                  </div>
+            <div class="between"><div><div class="h2">Cardápio de hoje</div><div class="small muted2">${cap(fmtDate(new Date().toISOString(), { weekday: "long" }))} · a sugestão do dia muda todo dia</div></div><span class="chip"><${Icon} n="calendar" s=${14} />${plan.createdAt ? fmtDate(plan.createdAt, { day: "2-digit", month: "2-digit" }) : ""}</span></div>
+            ${plan.meals.map((m, i) => {
+              const opts = planOptions(m, plan);
+              const todayIdx = opts.length ? doy % opts.length : 0;
+              const done = today.some((x) => x.planMeal === m.name || x.mealType === m.name);
+              return html`<div class="card tight" key=${i}>
+                <div class="row" style="gap:8px;flex-wrap:wrap">
+                  ${m.time && html`<span class="tag">${m.time}</span>`}<span class="h3">${m.name}</span>
+                  ${done ? html`<span class="tag gr" style="margin-left:auto">✓ registrado hoje</span>` : int(m.calories) > 0 && html`<span class="tiny b muted2 num" style="margin-left:auto">~${int(m.calories)} kcal</span>`}
                 </div>
-              </div>
-            </div>`)}
-            <div class="grid2">
-              <button class="btn btn-soft" onClick=${() => go("cozinha", "compras")}><${Icon} n="cart" s=${18} />Lista de compras</button>
-              <button class="btn btn-soft" onClick=${() => go("cozinha", "receitas")}><${Icon} n="chef" s=${18} />Receitas do plano</button>
-            </div>
+                <div class="stack" style="gap:8px;margin-top:12px">
+                  ${opts.map((o, j) => {
+                    const key = i + "-" + j, isTod = j === todayIdx;
+                    return html`<div class=${"plan-opt " + (isTod ? "today" : "")} key=${key}>
+                      <div class="grow">
+                        <div class="row" style="gap:6px;margin-bottom:3px">${isTod ? html`<span class="tag">Sugestão de hoje</span>` : html`<span class="tag soft">Opção ${String.fromCharCode(65 + j)}</span>`}<span class="tiny muted2 b num">${int(o.kcal)} kcal</span></div>
+                        <div class="small" style="color:#334155">${o.text}</div>
+                      </div>
+                      <button class=${"btn btn-sm " + (isTod ? "btn-or" : "btn-soft")} disabled=${logging === key} onClick=${() => ate(m, o, key)} title="Registrar no diário">${logging === key ? html`<${Spinner} s=${16} />` : html`<${Icon} n="check" s=${16} />Comi`}</button>
+                    </div>`;
+                  })}
+                </div>
+              </div>`;
+            })}
           </div>
         </div>`}
   </div>`;
@@ -1255,7 +1669,7 @@ function RecipeModal({ r, fav, onFav, onClose, user }) {
   const log = async () => {
     setBusy(true);
     try {
-      await addDoc(collection(db, "meals"), clean({ uid: user.uid, foodName: str(r.name, 80), calories: int(r.calories), protein: int(r.protein), carbs: int(r.carbs), fat: int(r.fat), analysis: r.tip || r.description || "", imageUrl: null, textDescription: `Receita: ${r.name} (1 porção)`, source: "recipe", timestamp: new Date().toISOString() }));
+      await addDoc(collection(db, "meals"), clean({ uid: user.uid, foodName: str(r.name, 80), calories: int(r.calories), protein: int(r.protein), carbs: int(r.carbs), fat: int(r.fat), analysis: r.tip || r.description || "", imageUrl: null, textDescription: `Receita: ${r.name} (1 porção)`, source: "recipe", mealType: mealTypeFor(), timestamp: new Date().toISOString() }));
       toast("Receita registrada no diário!"); onClose();
     } catch (e) { toast("Não foi possível registrar.", "err"); } finally { setBusy(false); }
   };
@@ -1279,43 +1693,43 @@ function RecipeModal({ r, fav, onFav, onClose, user }) {
   <//>`;
 }
 
-function Kitchen({ user, profile, plan, shopping, pantryDoc, section, setSection }) {
+function Kitchen({ user, profile, plan, shopping, pantryDoc, recipes, section, setSection }) {
   const pantry = pantryDoc?.ingredients || [];
-  const recipes = pantryDoc?.recipes || {};
-  const favorites = pantryDoc?.favorites || [];
   const items = (shopping?.items || []).map((i) => (typeof i === "string" ? { name: i, checked: false } : i));
   const [busy, setBusy] = useState(null); // 'shop' | 'pantry' | 'plan'
   const [err, setErr] = useState(null);
   const [newIng, setNewIng] = useState("");
   const [newItem, setNewItem] = useState("");
-  const [open, setOpen] = useState(null);
+  const [openId, setOpenId] = useState(null);
   const validPlan = plan && Array.isArray(plan.meals) && plan.meals.length;
+  const byKind = (k) => recipes.filter((r) => r.kind === k).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const favorites = recipes.filter((r) => r.favorite);
+  const open = openId ? recipes.find((r) => r.id === openId) : null;
 
-  const savePantry = (patch) => setDoc(doc(db, "pantry", user.uid), clean({ uid: user.uid, ingredients: pantry, ...patch, updatedAt: new Date().toISOString() }), { merge: true });
   const saveShop = (list) => setDoc(doc(db, "shoppingLists", user.uid), clean({ uid: user.uid, items: list, updatedAt: new Date().toISOString() }));
+  const savePantry = (ingredients) => setDoc(doc(db, "pantry", user.uid), clean({ uid: user.uid, ingredients, updatedAt: new Date().toISOString() }), { merge: true });
 
   // --- compras ---
   const genShopping = async () => {
     if (!validPlan) { setErr('Crie um plano alimentar primeiro na aba "Plano".'); return; }
-    if (items.length && !(await confirmAsk({ title: "Gerar nova lista?", text: "A lista atual será substituída por uma nova, baseada no seu plano.", ok: "Gerar" }))) return;
+    if (items.length && !(await confirmAsk({ title: "Gerar nova lista?", text: "A lista atual será substituída por uma nova lista da semana, baseada no seu plano.", ok: "Gerar" }))) return;
     setBusy("shop"); setErr(null);
     try {
-      const r = await ai("shoppingList", { plan: { meals: plan.meals }, profile: profileForAI(profile) });
-      const list = (Array.isArray(r?.items) ? r.items : []).slice(0, 60).map((i) => ({ name: str(typeof i === "string" ? i : i?.name, 80), category: str(i?.category || "Outros", 30), checked: false })).filter((i) => i.name);
+      const r = await ai("shoppingList", { plan: { meals: plan.meals.map((m) => ({ name: m.name, options: planOptions(m, plan).map((o) => ({ text: o.text })) })) }, profile: profileForAI(profile) });
+      const list = (Array.isArray(r?.items) ? r.items : []).slice(0, 70).map((i) => ({ name: str(typeof i === "string" ? i : i?.name, 80), category: str(i?.category || "Outros", 30), checked: false })).filter((i) => i.name);
       if (!list.length) throw new Error("A IA não retornou itens. Tente novamente.");
-      await saveShop(list); toast("Lista de compras pronta!");
+      await saveShop(list); toast("Lista de compras da semana pronta!");
     } catch (e) { setErr(e.message); } finally { setBusy(null); }
   };
   const toggleItem = (idx) => saveShop(items.map((it, i) => (i === idx ? { ...it, checked: !it.checked } : it))).catch(() => toast("Erro ao salvar.", "err"));
   const removeItem = (idx) => saveShop(items.filter((_, i) => i !== idx)).catch(() => toast("Erro ao salvar.", "err"));
-  const addItem = (e) => { e.preventDefault(); const n = newItem.trim(); if (!n) return; setNewItem(""); saveShop([...items, { name: str(n, 80), category: "Outros", checked: false }]).catch(() => toast("Erro ao salvar.", "err")); };
+  const addItem = (e) => { e.preventDefault(); const nm = newItem.trim(); if (!nm) return; setNewItem(""); saveShop([...items, { name: str(nm, 80), category: "Outros", checked: false }]).catch(() => toast("Erro ao salvar.", "err")); };
   const moveCheckedToPantry = async () => {
     const bought = items.filter((i) => i.checked);
     if (!bought.length) return;
     const names = bought.map((i) => i.name.split(/\s+[—–-]\s+/)[0].trim());
-    const merged = uniqItems([...pantry, ...names]);
     try {
-      await setDoc(doc(db, "pantry", user.uid), clean({ uid: user.uid, ingredients: merged, updatedAt: new Date().toISOString() }), { merge: true });
+      await savePantry(uniqItems([...pantry, ...names]));
       await saveShop(items.filter((i) => !i.checked));
       toast(`${names.length} item(ns) foram para a despensa!`);
     } catch (e) { toast("Erro ao mover itens.", "err"); }
@@ -1328,52 +1742,50 @@ function Kitchen({ user, profile, plan, shopping, pantryDoc, section, setSection
   const checkedCount = items.filter((i) => i.checked).length;
 
   // --- despensa ---
-  const addIng = async (e) => {
+  const addIng = (e) => {
     e.preventDefault();
-    const parts = newIng.split(/[,;\n]/).map((s) => s.trim()).filter(Boolean).map((s) => str(s, 60));
+    const parts = newIng.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean).map((x) => str(x, 60));
     if (!parts.length) return;
     setNewIng("");
-    try { await setDoc(doc(db, "pantry", user.uid), clean({ uid: user.uid, ingredients: uniqItems([...pantry, ...parts]), updatedAt: new Date().toISOString() }), { merge: true }); }
-    catch { toast("Erro ao salvar.", "err"); }
+    savePantry(uniqItems([...pantry, ...parts])).catch(() => toast("Erro ao salvar.", "err"));
   };
-  const removeIng = (i) => setDoc(doc(db, "pantry", user.uid), clean({ uid: user.uid, ingredients: pantry.filter((_, j) => j !== i), updatedAt: new Date().toISOString() }), { merge: true }).catch(() => toast("Erro ao salvar.", "err"));
+  const removeIng = (i) => savePantry(pantry.filter((_, j) => j !== i)).catch(() => toast("Erro ao salvar.", "err"));
   const clearPantry = async () => {
     if (!(await confirmAsk({ title: "Esvaziar despensa?", text: "Todos os ingredientes serão removidos.", ok: "Esvaziar", danger: true }))) return;
-    setDoc(doc(db, "pantry", user.uid), clean({ uid: user.uid, ingredients: [], updatedAt: new Date().toISOString() }), { merge: true }).catch(() => toast("Erro ao salvar.", "err"));
+    savePantry([]).catch(() => toast("Erro ao salvar.", "err"));
   };
 
-  // --- receitas ---
+  // --- receitas (coleção própria "recipes") ---
   const genRecipes = async (mode) => {
     if (mode === "pantry" && !pantry.length) { setSection("despensa"); toast("Adicione ingredientes na despensa primeiro.", "err"); return; }
     if (mode === "plan" && !validPlan) { setErr('Crie um plano alimentar primeiro na aba "Plano".'); return; }
     setBusy(mode); setErr(null);
     try {
-      const current = (recipes[mode] || []).map((r) => r.name);
-      const r = await ai("recipes", { mode, pantry, plan: validPlan ? { meals: plan.meals } : null, profile: profileForAI(profile), avoid: current });
+      const current = byKind(mode);
+      const r = await ai("recipes", { mode, pantry, plan: validPlan ? { meals: plan.meals.map((m) => ({ name: m.name, options: planOptions(m, plan).map((o) => ({ text: o.text })) })) } : null, profile: profileForAI(profile), avoid: current.map((x) => x.name) });
       const list = (Array.isArray(r?.recipes) ? r.recipes : []).slice(0, 6).map(normalizeRecipe).filter((x) => x.ingredients.length && x.instructions.length);
       if (!list.length) throw new Error("A IA não retornou receitas. Tente novamente.");
-      await savePantry({ recipes: { [mode]: list, [mode + "At"]: new Date().toISOString() } });
+      const at = new Date().toISOString();
+      await Promise.all(list.map((rec, i) => addDoc(collection(db, "recipes"), clean({ ...rec, uid: user.uid, kind: mode, favorite: false, order: i, createdAt: at }))));
+      await Promise.all(current.filter((x) => !x.favorite).map((x) => deleteDoc(doc(db, "recipes", x.id)).catch(() => {})));
       setSection("receitas");
       toast("Receitas novas salvas!");
     } catch (e) { setErr(e.message); } finally { setBusy(null); }
   };
-  const isFav = (r) => favorites.some((f) => f.id === r.id || f.name === r.name);
-  const toggleFav = (r) => {
-    const next = isFav(r) ? favorites.filter((f) => f.id !== r.id && f.name !== r.name) : [r, ...favorites].slice(0, 40);
-    savePantry({ favorites: next }).catch(() => toast("Erro ao salvar.", "err"));
-  };
+  const toggleFav = (r) => updateDoc(doc(db, "recipes", r.id), { favorite: !r.favorite }).catch(() => toast("Erro ao salvar.", "err"));
 
   const RecipeBlock = ({ title, mode, icon, sub }) => {
-    const list = recipes[mode] || [];
+    const list = byKind(mode).filter((r) => !r.favorite);
+    const at = list[0]?.createdAt;
     return html`<div class="stack">
       <div class="between" style="flex-wrap:wrap">
         <div class="row"><div class=${"icon-box " + (mode === "pantry" ? "ib-or" : "ib-gr")}><${Icon} n=${icon} s=${20} /></div>
-          <div><div class="h3">${title}</div><div class="tiny muted2 b">${recipes[mode + "At"] ? "Geradas em " + fmtDate(recipes[mode + "At"], { day: "numeric", month: "short" }) : sub}</div></div></div>
-        <button class="btn btn-sm ${list.length ? "btn-soft" : "btn-dark"}" disabled=${!!busy} onClick=${() => genRecipes(mode)}>
+          <div><div class="h3">${title}</div><div class="tiny muted2 b">${at ? "Geradas em " + fmtDate(at, { day: "numeric", month: "short" }) : sub}</div></div></div>
+        <button class=${"btn btn-sm " + (list.length ? "btn-soft" : "btn-dark")} disabled=${!!busy} onClick=${() => genRecipes(mode)}>
           ${busy === mode ? html`<${Spinner} s=${16} />Criando...` : html`<${Icon} n=${list.length ? "refresh" : "sparkles"} s=${16} />${list.length ? "Gerar outras" : "Gerar receitas"}`}</button>
       </div>
       ${busy === mode && !list.length ? html`<div class="cards-grid">${[1, 2].map(() => html`<div class="card tight stack"><div class="skeleton" style="width:40%"></div><div class="skeleton" style="width:85%;height:18px"></div><div class="skeleton" style="width:70%"></div></div>`)}</div>`
-        : list.length ? html`<div class="cards-grid">${list.map((r) => html`<${RecipeCard} key=${r.id} r=${r} fav=${isFav(r)} onOpen=${() => setOpen(r)} onFav=${() => toggleFav(r)} />`)}</div>`
+        : list.length ? html`<div class="cards-grid">${list.map((r) => html`<${RecipeCard} key=${r.id} r=${r} fav=${!!r.favorite} onOpen=${() => setOpenId(r.id)} onFav=${() => toggleFav(r)} />`)}</div>`
         : html`<div class="card dashed tight small muted center" style="padding:20px">${mode === "pantry" ? (pantry.length ? `Toque em "Gerar receitas" para usar os ${pantry.length} itens da sua despensa.` : "Sua despensa está vazia. Adicione ingredientes primeiro.") : validPlan ? 'Toque em "Gerar receitas" para ideias que seguem seu plano.' : "Crie um plano alimentar para receber sugestões."}</div>`}
     </div>`;
   };
@@ -1389,7 +1801,7 @@ function Kitchen({ user, profile, plan, shopping, pantryDoc, section, setSection
 
     ${section === "compras" && html`<div class="card stack-lg">
       <div class="between" style="flex-wrap:wrap">
-        <div><div class="h2">Lista de Compras</div><div class="small muted2">${shopping?.updatedAt ? `Atualizada em ${fmtDate(shopping.updatedAt, { day: "numeric", month: "short" })} · ${checkedCount}/${items.length} comprados` : "Baseada no seu plano alimentar."}</div></div>
+        <div><div class="h2">Lista de Compras da Semana</div><div class="small muted2">${shopping?.updatedAt ? `Atualizada em ${fmtDate(shopping.updatedAt, { day: "numeric", month: "short" })} · ${checkedCount}/${items.length} comprados` : "Baseada nas opções do seu plano alimentar."}</div></div>
         <button class="btn btn-dark btn-sm" disabled=${!!busy} onClick=${genShopping}>${busy === "shop" ? html`<${Spinner} s=${16} />Gerando...` : html`<${Icon} n="sparkles" s=${16} c="or" />${items.length ? "Gerar nova" : "Gerar pelo plano"}`}</button>
       </div>
       <form class="row" onSubmit=${addItem}><input class="input" value=${newItem} onInput=${(e) => setNewItem(e.target.value)} placeholder="Adicionar item à lista..." /><button class="btn btn-dark" style="padding:12px 14px" aria-label="Adicionar"><${Icon} n="plus" /></button></form>
@@ -1417,13 +1829,13 @@ function Kitchen({ user, profile, plan, shopping, pantryDoc, section, setSection
     ${section === "receitas" && html`<div class="stack-lg">
       ${favorites.length > 0 && html`<div class="stack">
         <div class="row"><div class="icon-box" style="background:#fef2f2;color:#ef4444"><${Icon} n="heart" s=${20} /></div><div class="h3">Favoritas</div></div>
-        <div class="cards-grid">${favorites.map((r) => html`<${RecipeCard} key=${r.id} r=${r} fav=${true} onOpen=${() => setOpen(r)} onFav=${() => toggleFav(r)} />`)}</div>
+        <div class="cards-grid">${favorites.map((r) => html`<${RecipeCard} key=${"f" + r.id} r=${r} fav=${true} onOpen=${() => setOpenId(r.id)} onFav=${() => toggleFav(r)} />`)}</div>
       </div>`}
       <${RecipeBlock} title="Com o que tenho em casa" mode="pantry" icon="fridge" sub="Usa os itens da sua despensa" />
       <${RecipeBlock} title="Sugestões do meu plano" mode="plan" icon="sparkles" sub="Receitas que seguem sua dieta" />
     </div>`}
 
-    ${open && html`<${RecipeModal} r=${open} user=${user} fav=${isFav(open)} onFav=${() => toggleFav(open)} onClose=${() => setOpen(null)} />`}
+    ${open && html`<${RecipeModal} r=${open} user=${user} fav=${!!open.favorite} onFav=${() => toggleFav(open)} onClose=${() => setOpenId(null)} />`}
   </div>`;
 }
 
@@ -1460,12 +1872,22 @@ function useDocument(path, uid) {
   return data;
 }
 
+function ProfileTab({ user, profile, weights, go }) {
+  return html`<div class="anim">
+    <${WeightSection} user=${user} profile=${profile} weights=${weights} />
+    <${RemindersCard} user=${user} profile=${profile} />
+    <${ProfileForm} user=${user} profile=${profile} weights=${weights} onSaved=${() => go("resumo")} />
+  </div>`;
+}
+
 function App() {
   const [user, setUser] = useState(undefined);
   const [tab, setTab] = useState(readHash());
   const [kitchenSection, setKitchenSection] = useState(store.get("kitchen", "compras"));
   const [mealOpen, setMealOpen] = useState(null);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [weightOpen, setWeightOpen] = useState(false);
+  const [disclaimerClosed, setDisclaimerClosed] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u || null)), []);
   useEffect(() => {
@@ -1477,20 +1899,66 @@ function App() {
 
   const uid = user?.uid;
   const profile = useDocument("users", uid);
+  const aiState = useDocument("aiState", uid);
   const mealsRaw = useCollection("meals", uid);
   const waterRaw = useCollection("waterLogs", uid);
   const plansRaw = useCollection("dietPlans", uid);
+  const weightsRaw = useCollection("weightLogs", uid);
+  const recipesRaw = useCollection("recipes", uid);
   const shopping = useDocument("shoppingLists", uid);
   const pantryDoc = useDocument("pantry", uid);
 
   const meals = useMemo(() => (mealsRaw || []).filter((m) => m.timestamp).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)), [mealsRaw]);
   const water = waterRaw || [];
+  const weights = useMemo(() => (weightsRaw || []).filter((w) => w.timestamp && num(w.weight) > 0).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)), [weightsRaw]);
+  const recipes = recipesRaw || [];
   const plan = useMemo(() => {
     const p = (plansRaw || []).filter((p) => Array.isArray(p.meals) && p.meals.length).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
     return p ? { ...p, dailyCalories: num(p.dailyCalories) || num(p.dailyCalorieTarget) || int(profile?.dailyCalorieGoal), macros: p.macros || {}, tips: Array.isArray(p.tips) ? p.tips : [] } : null;
   }, [plansRaw, profile?.dailyCalorieGoal]);
 
-  // Mantém o modal de refeição sincronizado com o banco
+  // Migração única: receitas/favoritas que ficavam dentro do documento da despensa -> coleção "recipes"
+  const migrated = useRef(false);
+  useEffect(() => {
+    if (!uid || migrated.current || !pantryDoc || recipesRaw === null) return;
+    const old = pantryDoc.recipes || {};
+    const legacy = [...(old.pantry || []).map((r) => ({ ...r, kind: "pantry" })), ...(old.plan || []).map((r) => ({ ...r, kind: "plan" }))];
+    const favs = pantryDoc.favorites || [];
+    if (!legacy.length && !favs.length) return;
+    migrated.current = true;
+    (async () => {
+      try {
+        const favNames = new Set(favs.map((f) => f.name));
+        const all = [...legacy, ...favs.filter((f) => !legacy.some((l) => l.name === f.name)).map((f) => ({ ...f, kind: f.kind || "plan" }))];
+        const at = new Date().toISOString();
+        await Promise.all(all.map((r, i) => { const { id, ...rest } = r; return addDoc(collection(db, "recipes"), clean({ ...rest, uid, favorite: favNames.has(r.name), order: i, createdAt: at })); }));
+        await setDoc(doc(db, "pantry", uid), { uid, ingredients: pantryDoc.ingredients || [], recipes: deleteField(), favorites: deleteField() }, { merge: true });
+      } catch (e) { console.warn("Migração de receitas adiada:", e?.code || e); migrated.current = false; }
+    })();
+  }, [uid, pantryDoc, recipesRaw]);
+
+  // Lembretes por notificação (enquanto o app estiver aberto ou em segundo plano)
+  const live = useRef({});
+  live.current = { profile, meals, water, plan, weights };
+  useEffect(() => {
+    if (!uid) return;
+    const tick = () => {
+      const st = live.current;
+      if (!st.profile || !store.get("notify", false) || !("Notification" in window) || Notification.permission !== "granted") return;
+      const shown = store.get("shown", {});
+      for (const r of computeReminders(st)) {
+        if (shown[r.id]) continue;
+        shown[r.id] = Date.now();
+        showNotification(r);
+      }
+      const cutoff = Date.now() - 3 * 864e5;
+      store.set("shown", Object.fromEntries(Object.entries(shown).filter(([, t]) => t > cutoff)));
+    };
+    const first = setTimeout(tick, 15000);
+    const id = setInterval(tick, 5 * 60000);
+    return () => { clearTimeout(first); clearInterval(id); };
+  }, [uid]);
+
   const liveMeal = mealOpen ? meals.find((m) => m.id === mealOpen.id) : null;
 
   const go = (t, sub) => {
@@ -1498,20 +1966,17 @@ function App() {
     if (location.hash !== "#" + t) location.hash = t; else setTab(t);
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
-
   const logout = async () => {
     if (await confirmAsk({ title: "Sair da conta?", text: "Seus dados continuam salvos na nuvem.", ok: "Sair" })) signOut(auth);
   };
 
-  if (user === undefined || (user && profile === undefined)) {
-    return html`<div class="splash"><${Spinner} s=${36} c="or" /></div>`;
-  }
+  if (user === undefined || (user && profile === undefined)) return html`<div class="splash"><${Spinner} s=${36} c="or" /></div>`;
   if (!user) return html`<${AuthScreen} /><${Toasts} />`;
   if (!profile || !profile.weight) {
     return html`<div class="wrap" style="padding-bottom:40px">
       <div class="between" style="margin-bottom:20px"><div class="brand"><div class="logo"><${Icon} n="flame" s=${22} /></div><div><div class="brand-name">NutriTrack</div><div class="brand-sub">Quase lá!</div></div></div>
         <button class="btn btn-ghost btn-sm rd" onClick=${() => signOut(auth)}><${Icon} n="logout" s=${16} />Sair</button></div>
-      <${ProfileForm} user=${user} profile=${profile} onboarding />
+      <${ProfileForm} user=${user} profile=${profile} weights=${[]} onboarding />
     </div><${Toasts} /><${ConfirmHost} />`;
   }
 
@@ -1529,25 +1994,32 @@ function App() {
 
     <main class="wrap" key=${tab}>
       ${loading ? html`<div class="splash" style="min-height:50vh"><${Spinner} s=${32} c="or" /></div>`
-        : tab === "resumo" ? html`<${Dashboard} user=${user} profile=${profile} meals=${meals} water=${water} plan=${plan} go=${go} openMeal=${setMealOpen} openHistory=${() => setHistoryOpen(true)} />`
+        : tab === "resumo" ? html`<${Dashboard} user=${user} profile=${profile} aiState=${aiState} meals=${meals} water=${water} plan=${plan} weights=${weights} go=${go} openMeal=${setMealOpen} openHistory=${() => setHistoryOpen(true)} openWeight=${() => setWeightOpen(true)} />`
         : tab === "analisar" ? html`<${Analyze} user=${user} profile=${profile} meals=${meals} go=${go} />`
-        : tab === "plano" ? html`<${PlanView} user=${user} profile=${profile} plan=${plan} go=${go} />`
-        : tab === "cozinha" ? html`<${Kitchen} user=${user} profile=${profile} plan=${plan} shopping=${shopping} pantryDoc=${pantryDoc} section=${kitchenSection} setSection=${setKitchenSection} />`
-        : html`<${ProfileForm} user=${user} profile=${profile} onSaved=${() => go("resumo")} />`}
-      <div class="footer-note">NutriTrack v${APP_VERSION} · IA integrada</div>
+        : tab === "plano" ? html`<${PlanView} user=${user} profile=${profile} plan=${plan} meals=${meals} go=${go} />`
+        : tab === "cozinha" ? html`<${Kitchen} user=${user} profile=${profile} plan=${plan} shopping=${shopping} pantryDoc=${pantryDoc} recipes=${recipes} section=${kitchenSection} setSection=${setKitchenSection} />`
+        : html`<${ProfileTab} user=${user} profile=${profile} weights=${weights} go=${go} />`}
+      <div class="footer-note">NutriTrack v${APP_VERSION} · Estimativas de IA · Não substitui orientação de nutricionista ou médico</div>
     </main>
 
     <nav class="nav" aria-label="Navegação principal"><div class="nav-in">
       ${TABS.map(([k, i, l]) => html`<button class=${(tab === k ? "on " : "") + (k === "analisar" ? "cta" : "")} onClick=${() => go(k)} aria-current=${tab === k ? "page" : null}><span class="nb"><${Icon} n=${i} s=${20} /></span>${l}</button>`)}
     </div></nav>
 
-    ${liveMeal && html`<${MealModal} key=${liveMeal.id} meal=${liveMeal} user=${user} onClose=${() => setMealOpen(null)} />`}
+    ${liveMeal && html`<${MealModal} key=${liveMeal.id} meal=${liveMeal} meals=${meals} user=${user} onClose=${() => setMealOpen(null)} />`}
     ${historyOpen && !liveMeal && html`<${HistoryModal} meals=${meals} onClose=${() => setHistoryOpen(false)} openMeal=${(m) => setMealOpen(m)} />`}
+    ${weightOpen && html`<${WeightQuickModal} user=${user} profile=${profile} onClose=${() => setWeightOpen(false)} />`}
+    ${!profile.disclaimerAck && !disclaimerClosed && html`<${DisclaimerModal} user=${user} onClose=${() => setDisclaimerClosed(true)} />`}
     <${Toasts} /><${ConfirmHost} />
   </div>`;
 }
 
 render(html`<${App} />`, document.getElementById("app"));
+
+// App instalável + funcionamento offline (só quando servido pela web)
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch((e) => console.warn("SW:", e)));
+}
 </script>
 </body>
 </html>
