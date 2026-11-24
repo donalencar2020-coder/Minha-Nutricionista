@@ -1,5 +1,0 @@
-{
-  "name": "NutriTrack AI",
-  "description": "Uma aplicação inteligente para acompanhamento de dieta e emagrecimento, com análise de alimentos por imagem e planos personalizados.",
-  "requestFramePermissions": ["camera"]
-}
