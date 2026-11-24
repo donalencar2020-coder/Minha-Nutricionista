@@ -1,0 +1,15 @@
+[build]
+  # Sem etapa de build: o app é um único index.html
+  command = "echo 'NutriTrack: sem build'"
+  publish = "public"
+  functions = "netlify/functions"
+
+[functions]
+  node_bundler = "esbuild"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(self)"
