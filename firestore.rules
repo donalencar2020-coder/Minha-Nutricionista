@@ -1,169 +1,93 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: users
-    // Fields:
-    //   - uid: string (required)
-    //   - email: string (required)
-    //   - name: string
-    //   - height: number
-    //   - weight: number
-    //   - age: number
-    //   - gender: string (male/female/other)
-    //   - activityLevel: string
-    //   - goal: string
-    //   - dailyCalorieGoal: number
-    //   - restrictions: list (optional)
-    //   - createdAt: string (ISO date)
-    //
-    // Collection: meals
-    // Fields:
-    //   - uid: string (required)
-    //   - foodName: string
-    //   - calories: number
-    //   - protein: number
-    //   - carbs: number
-    //   - fat: number
-    //   - analysis: string
-    //   - imageUrl: string
-    //   - timestamp: string (ISO date)
-    //
-    // Collection: dietPlans
-    // Fields:
-    //   - uid: string (required)
-    //   - dailyCalories: number
-    //   - macros: map
-    //   - meals: list
-    //   - tips: list
-    //   - createdAt: string (ISO date)
-    //
-    // Collection: shoppingLists
-    // Fields:
-    //   - uid: string (required)
-    //   - items: list of objects {name: string, checked: boolean}
-    //   - updatedAt: string (ISO date)
-    //
-    // Collection: pantry
-    // Fields:
-    //   - uid: string (required)
-    //   - ingredients: list
-    //   - updatedAt: string (ISO date)
-    //
-    // Collection: waterLogs
-    // Fields:
-    //   - uid: string (required)
-    //   - amount: number (required)
-    //   - timestamp: string (ISO date) (required)
-    //
-    // ===============================================================
+    // NutriTrack 2.1 — cada usuário só acessa os próprios dados.
 
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
-
-    function isDocOwner() {
-      return isAuthenticated() && request.auth.uid == resource.data.uid;
-    }
-
-    function isRequestOwner() {
-      return isAuthenticated() && request.auth.uid == request.resource.data.uid;
-    }
-
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
-
-    function isValidDateString(dateStr) {
-      return dateStr is string && dateStr.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$");
-    }
-
-    // ===============================================================
-    // Domain Validators
-    // ===============================================================
-
-    function isValidUser(data) {
-      return data.uid == request.auth.uid;
-    }
+    function isAuthenticated() { return request.auth != null; }
+    function isOwner(userId) { return isAuthenticated() && request.auth.uid == userId; }
+    function isRequestOwner() { return isAuthenticated() && request.auth.uid == request.resource.data.uid; }
+    function ownsExisting() { return isAuthenticated() && resource.data.uid == request.auth.uid; }
+    function canReadOwn() { return isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid); }
+    function isValidDateString(d) { return d is string && d.matches("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.*Z?$"); }
 
     function isValidMeal(data) {
-      return data.keys().hasAll(['uid', 'calories', 'timestamp']) &&
-             data.uid == request.auth.uid &&
-             data.calories is number &&
-             isValidDateString(data.timestamp);
+      return data.keys().hasAll(['uid', 'calories', 'timestamp']) && data.uid == request.auth.uid
+        && data.calories is number && isValidDateString(data.timestamp);
     }
-
     function isValidDietPlan(data) {
-      return data.keys().hasAll(['uid', 'dailyCalories', 'macros', 'meals', 'tips', 'createdAt']) &&
-             data.uid == request.auth.uid &&
-             data.dailyCalories is number &&
-             data.macros is map &&
-             data.meals is list &&
-             data.tips is list &&
-             isValidDateString(data.createdAt);
+      return data.keys().hasAll(['uid', 'dailyCalories', 'macros', 'meals', 'tips', 'createdAt']) && data.uid == request.auth.uid
+        && data.dailyCalories is number && data.macros is map && data.meals is list && data.tips is list && isValidDateString(data.createdAt);
     }
-
     function isValidWaterLog(data) {
-      return data.keys().hasAll(['uid', 'amount', 'timestamp']) &&
-             data.uid == request.auth.uid &&
-             data.amount is number &&
-             isValidDateString(data.timestamp);
+      return data.keys().hasAll(['uid', 'amount', 'timestamp']) && data.uid == request.auth.uid
+        && data.amount is number && isValidDateString(data.timestamp);
     }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
+    function isValidWeightLog(data) {
+      return data.keys().hasAll(['uid', 'weight', 'timestamp']) && data.uid == request.auth.uid
+        && data.weight is number && data.weight > 20 && data.weight < 400 && isValidDateString(data.timestamp);
+    }
 
     match /users/{userId} {
       allow read: if isOwner(userId);
-      allow create: if isOwner(userId) && isValidUser(request.resource.data);
-      allow update: if isOwner(userId) && isValidUser(request.resource.data);
+      allow create, update: if isOwner(userId) && request.resource.data.uid == request.auth.uid;
     }
 
-    match /meals/{mealId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid);
+    match /meals/{id} {
+      allow read: if canReadOwn();
       allow create: if isRequestOwner() && isValidMeal(request.resource.data);
-      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && isRequestOwner() && isValidMeal(request.resource.data);
-      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExisting() && isRequestOwner() && isValidMeal(request.resource.data);
+      allow delete: if ownsExisting();
     }
 
-    match /dietPlans/{planId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid);
+    // Fotos das refeições (separadas para deixar a lista leve). Máx. ~300 KB por foto.
+    match /mealPhotos/{id} {
+      allow read: if canReadOwn();
+      allow create: if isRequestOwner() && request.resource.data.data is string && request.resource.data.data.size() < 300000;
+      allow delete: if ownsExisting();
+    }
+
+    match /dietPlans/{id} {
+      allow read: if canReadOwn();
       allow create: if isRequestOwner() && isValidDietPlan(request.resource.data);
-      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && isRequestOwner() && isValidDietPlan(request.resource.data);
-      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExisting() && isRequestOwner() && isValidDietPlan(request.resource.data);
+      allow delete: if ownsExisting();
     }
 
-    match /shoppingLists/{listId} {
-      allow read: if isOwner(listId);
-      allow create: if isOwner(listId) && isRequestOwner() && request.resource.data.items is list;
-      allow update: if isOwner(listId) && isRequestOwner() && request.resource.data.items is list;
-      allow delete: if isOwner(listId);
-    }
-
-    match /pantry/{pantryId} {
-      allow read: if isOwner(pantryId);
-      allow create: if isOwner(pantryId) && isRequestOwner() && request.resource.data.ingredients is list;
-      allow update: if isOwner(pantryId) && isRequestOwner() && request.resource.data.ingredients is list;
-      allow delete: if isOwner(pantryId);
-    }
-
-    match /waterLogs/{logId} {
-      allow read: if isAuthenticated() && (resource == null || resource.data.uid == request.auth.uid);
+    match /waterLogs/{id} {
+      allow read: if canReadOwn();
       allow create: if isRequestOwner() && isValidWaterLog(request.resource.data);
-      allow update: if isAuthenticated() && resource.data.uid == request.auth.uid && isRequestOwner() && isValidWaterLog(request.resource.data);
-      allow delete: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow update: if ownsExisting() && isRequestOwner() && isValidWaterLog(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    match /weightLogs/{id} {
+      allow read: if canReadOwn();
+      allow create: if isRequestOwner() && isValidWeightLog(request.resource.data);
+      allow update: if ownsExisting() && isRequestOwner() && isValidWeightLog(request.resource.data);
+      allow delete: if ownsExisting();
+    }
+
+    match /recipes/{id} {
+      allow read: if canReadOwn();
+      allow create: if isRequestOwner() && request.resource.data.name is string;
+      allow update: if ownsExisting() && isRequestOwner() && request.resource.data.name is string;
+      allow delete: if ownsExisting();
+    }
+
+    // Respostas da IA guardadas (ex.: avaliação do dia) — 1 documento por usuário
+    match /aiState/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && request.resource.data.uid == request.auth.uid;
+    }
+
+    match /shoppingLists/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isRequestOwner() && request.resource.data.items is list;
+    }
+
+    match /pantry/{userId} {
+      allow read, delete: if isOwner(userId);
+      allow create, update: if isOwner(userId) && isRequestOwner() && request.resource.data.ingredients is list;
     }
 
     match /{path=**} {
