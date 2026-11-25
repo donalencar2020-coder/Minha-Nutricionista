@@ -22,7 +22,7 @@ App de nutrição em um único `index.html` (Preact + htm, sem etapa de build), 
 
 ## Coleções do Firestore
 
-`users`, `meals`, `mealPhotos`, `dietPlans`, `waterLogs`, `weightLogs`, `recipes`, `aiState`, `shoppingLists`, `pantry`.
+`users`, `meals`, `mealPhotos`, `dietPlans`, `waterLogs`, `weightLogs`, `recipes`, `reports`, `aiState`, `shoppingLists`, `pantry`.
 
 Ao mudar `firestore.rules`, publique as regras no Console do Firebase (Firestore → banco `ai-studio-…` → Regras).
 

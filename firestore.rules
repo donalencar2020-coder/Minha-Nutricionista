@@ -1,7 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // NutriTrack 2.1 — cada usuário só acessa os próprios dados.
+    // NutriTrack 2.2 — cada usuário só acessa os próprios dados.
 
     function isAuthenticated() { return request.auth != null; }
     function isOwner(userId) { return isAuthenticated() && request.auth.uid == userId; }
@@ -28,7 +28,7 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isOwner(userId);
+      allow read, delete: if isOwner(userId);
       allow create, update: if isOwner(userId) && request.resource.data.uid == request.auth.uid;
     }
 
@@ -71,6 +71,13 @@ service cloud.firestore {
       allow read: if canReadOwn();
       allow create: if isRequestOwner() && request.resource.data.name is string;
       allow update: if ownsExisting() && isRequestOwner() && request.resource.data.name is string;
+      allow delete: if ownsExisting();
+    }
+
+    // Relatórios semanais da Nutri
+    match /reports/{id} {
+      allow read: if canReadOwn();
+      allow create: if isRequestOwner() && request.resource.data.createdAt is string;
       allow delete: if ownsExisting();
     }
 
