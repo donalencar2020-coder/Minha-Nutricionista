@@ -196,7 +196,110 @@ const FOODS = [
   ["sushi (niguiri/uramaki)", 150, 6.0, 28.0, 1.5, "1 peça = 30 g"],
   ["sanduíche natural", 200, 11.0, 24.0, 6.5, "1 unidade = 150 g"],
 ];
-const FOOD_MAP = new Map(FOODS.map((f) => [f[0], { kcal: f[1], protein: f[2], carbs: f[3], fat: f[4] }]));
+// Itens extras (usados na busca manual do app e reconhecidos se a IA citar o nome exato)
+const EXTRA_FOODS = [
+  ["arroz carreteiro", 180, 9.0, 20.0, 7.0, "1 colher de servir = 60 g"],
+  ["baião de dois", 160, 6.0, 22.0, 5.0, "1 colher de servir = 60 g"],
+  ["risoto", 150, 4.0, 20.0, 6.0],
+  ["quinoa cozida", 120, 4.4, 21.3, 1.9, "1 colher de sopa = 20 g"],
+  ["mandioquinha cozida", 80, 0.9, 18.9, 0.2],
+  ["pão de hambúrguer", 280, 9.0, 50.0, 4.5, "1 unidade = 60 g"],
+  ["pão de cachorro-quente", 280, 9.0, 50.0, 4.5, "1 unidade = 50 g"],
+  ["tortilha/wrap", 300, 8.0, 50.0, 7.0, "1 unidade = 40 g"],
+  ["crepioca", 180, 11.0, 18.0, 7.0, "1 unidade = 80 g"],
+  ["macarrão instantâneo preparado", 140, 3.3, 19.0, 5.5, "1 pacote preparado = 270 g"],
+  ["mingau de aveia com leite", 100, 4.0, 14.0, 3.0, "1 tigela = 250 g"],
+  ["cereal matinal açucarado", 380, 6.0, 86.0, 0.5, "1 xícara = 30 g"],
+  ["barra de cereal", 400, 5.0, 75.0, 8.0, "1 unidade = 25 g"],
+  ["barra de proteína", 380, 30.0, 35.0, 12.0, "1 unidade = 45 g"],
+  ["biscoito de arroz", 380, 8.0, 80.0, 3.0, "1 unidade = 9 g"],
+  ["biscoito de polvilho", 438, 1.3, 75.0, 14.0, "1 punhado = 20 g"],
+  ["croissant", 410, 8.0, 46.0, 21.0, "1 unidade = 60 g"],
+  ["frango à parmegiana", 220, 18.0, 9.0, 12.0, "1 porção = 200 g"],
+  ["bife à milanesa", 280, 22.0, 12.0, 16.0, "1 bife = 120 g"],
+  ["almôndega", 210, 15.0, 8.0, 13.0, "1 unidade = 30 g"],
+  ["cupim assado", 330, 28.0, 0.0, 24.0],
+  ["fígado bovino grelhado", 225, 29.9, 4.2, 9.0, "1 bife = 100 g"],
+  ["carne seca cozida", 300, 35.0, 0.0, 17.0],
+  ["lagarto/carne assada", 222, 32.9, 0.0, 9.1, "1 fatia = 80 g"],
+  ["frango assado com pele", 210, 29.0, 0.0, 10.0],
+  ["asa de frango assada", 240, 25.0, 0.0, 15.0, "1 unidade = 40 g"],
+  ["coração de frango", 207, 22.4, 0.0, 12.1, "1 espeto = 100 g"],
+  ["kafta", 240, 18.0, 4.0, 17.0, "1 espeto = 80 g"],
+  ["frango xadrez", 150, 14.0, 8.0, 7.0],
+  ["merluza assada", 122, 26.6, 0.0, 0.9, "1 filé = 120 g"],
+  ["bacalhau cozido", 140, 30.0, 0.0, 1.5],
+  ["ovo de codorna", 177, 13.7, 0.8, 12.7, "1 unidade = 10 g"],
+  ["nuggets de frango", 250, 15.0, 15.0, 15.0, "1 unidade = 20 g"],
+  ["leite em pó integral", 497, 25.4, 39.2, 26.9, "1 colher de sopa = 16 g"],
+  ["queijo coalho", 320, 25.0, 2.0, 24.0, "1 espeto = 50 g"],
+  ["ricota", 140, 12.6, 3.8, 8.1, "1 fatia = 30 g"],
+  ["cream cheese", 300, 6.0, 4.0, 29.0, "1 colher de sopa = 20 g"],
+  ["kefir", 60, 3.3, 4.5, 3.2],
+  ["bebida láctea", 75, 2.5, 13.0, 1.5, "1 garrafinha = 200 g"],
+  ["leite de amêndoas sem açúcar", 17, 0.5, 0.5, 1.2, "1 copo = 200 ml"],
+  ["leite de soja", 45, 3.0, 4.5, 1.8, "1 copo = 200 ml"],
+  ["doce de leite", 306, 5.5, 55.4, 6.0, "1 colher de sopa = 20 g"],
+  ["caqui", 71, 0.4, 19.3, 0.1, "1 unidade = 110 g"],
+  ["maracujá (polpa)", 68, 2.0, 12.3, 2.1],
+  ["jabuticaba", 58, 0.6, 15.3, 0.1],
+  ["acerola", 33, 0.9, 8.0, 0.2],
+  ["pitaya", 50, 1.1, 11.0, 0.4],
+  ["coco seco", 406, 3.7, 10.4, 42.0],
+  ["frutas vermelhas", 45, 0.9, 10.0, 0.4],
+  ["salada de frutas", 60, 0.7, 15.0, 0.2, "1 tigela = 150 g"],
+  ["vitamina de banana com leite", 80, 2.8, 13.0, 2.0, "1 copo = 300 ml"],
+  ["banana da terra cozida", 128, 1.4, 33.7, 0.2, "1 unidade = 120 g"],
+  ["pêssego", 36, 0.8, 9.3, 0.1, "1 unidade = 110 g"],
+  ["ameixa", 53, 0.8, 13.9, 0.1, "1 unidade = 60 g"],
+  ["espinafre refogado", 67, 2.7, 4.2, 5.4],
+  ["rúcula", 13, 1.8, 2.2, 0.1],
+  ["agrião", 17, 2.7, 2.3, 0.2],
+  ["berinjela cozida", 19, 0.7, 4.5, 0.1],
+  ["palmito em conserva", 23, 1.8, 4.3, 0.4],
+  ["pimentão", 21, 1.1, 4.9, 0.2],
+  ["cogumelo refogado", 35, 2.5, 3.5, 1.5],
+  ["salada de maionese", 145, 2.0, 14.0, 9.0, "1 colher de servir = 60 g"],
+  ["vinagrete", 30, 0.8, 5.0, 1.0, "1 colher de sopa = 20 g"],
+  ["sopa de legumes", 45, 1.5, 7.0, 1.2, "1 prato = 300 g"],
+  ["canja de galinha", 60, 4.5, 7.0, 1.5, "1 prato = 300 g"],
+  ["pudim de leite", 230, 5.5, 37.0, 7.0, "1 fatia = 80 g"],
+  ["mousse de maracujá", 240, 4.0, 32.0, 11.0, "1 taça = 80 g"],
+  ["paçoca", 480, 15.0, 52.0, 24.0, "1 unidade = 20 g"],
+  ["bombom", 500, 5.0, 60.0, 26.0, "1 unidade = 20 g"],
+  ["picolé de fruta", 90, 0.2, 22.0, 0.1, "1 unidade = 60 g"],
+  ["gelatina", 60, 1.5, 14.0, 0.0, "1 pote = 100 g"],
+  ["empada de frango", 360, 8.0, 35.0, 21.0, "1 unidade = 60 g"],
+  ["quibe frito", 254, 15.0, 15.0, 15.0, "1 unidade = 70 g"],
+  ["enroladinho de salsicha", 320, 9.0, 35.0, 16.0, "1 unidade = 70 g"],
+  ["batata chips", 540, 6.0, 52.0, 35.0, "1 pacote pequeno = 25 g"],
+  ["cachorro-quente", 250, 9.0, 25.0, 12.0, "1 unidade = 150 g"],
+  ["chá sem açúcar", 1, 0.0, 0.2, 0.0, "1 xícara = 200 ml"],
+  ["isotônico", 25, 0.0, 6.0, 0.0, "1 garrafa = 500 ml"],
+  ["energético", 45, 0.0, 11.0, 0.0, "1 lata = 250 ml"],
+  ["caldo de cana", 70, 0.0, 18.0, 0.0, "1 copo = 300 ml"],
+  ["cerveja sem álcool", 22, 0.3, 5.0, 0.0, "1 lata = 350 ml"],
+  ["caipirinha", 140, 0.0, 12.0, 0.0, "1 copo = 200 ml"],
+  ["destilado (cachaça/vodka)", 230, 0.0, 0.0, 0.0, "1 dose = 50 ml"],
+  ["suco de uva integral", 66, 0.2, 16.0, 0.0, "1 copo = 200 ml"],
+  ["leite com achocolatado", 85, 3.0, 12.0, 3.0, "1 copo = 250 ml"],
+  ["cappuccino", 70, 2.5, 10.0, 2.5, "1 xícara = 200 ml"],
+  ["refresco em pó preparado", 30, 0.0, 7.5, 0.0, "1 copo = 250 ml"],
+  ["molho shoyu", 60, 6.0, 8.0, 0.0, "1 colher de sopa = 15 ml"],
+  ["mostarda", 66, 4.0, 5.0, 3.5, "1 colher de sopa = 15 g"],
+  ["geleia de frutas", 250, 0.3, 65.0, 0.0, "1 colher de sopa = 20 g"],
+  ["molho branco", 120, 3.0, 8.0, 8.0],
+  ["amêndoas", 580, 21.0, 22.0, 50.0, "1 punhado = 30 g"],
+  ["linhaça", 495, 14.1, 43.3, 32.3, "1 colher de sopa = 10 g"],
+  ["mix de castanhas", 600, 18.0, 20.0, 52.0, "1 punhado = 30 g"],
+  ["feijão branco cozido", 102, 6.6, 18.0, 0.5],
+  ["soja cozida", 150, 14.0, 9.0, 7.0],
+  ["proteína de soja hidratada", 110, 16.0, 10.0, 0.4],
+  ["tofu", 76, 8.0, 1.9, 4.8, "1 fatia = 50 g"],
+  ["homus", 170, 7.9, 14.3, 9.6, "1 colher de sopa = 20 g"],
+];
+const ALL_FOODS = [...FOODS, ...EXTRA_FOODS];
+const FOOD_MAP = new Map(ALL_FOODS.map((f) => [f[0], { kcal: f[1], protein: f[2], carbs: f[3], fat: f[4] }]));
 const FOOD_LIST_PROMPT = FOODS.map((f) => (f[5] ? `${f[0]} (${f[5]})` : f[0])).join("; ");
 
 // ---------- utilidades ----------
@@ -371,30 +474,47 @@ const TASKS = {
   },
 
   async dietPlan(p) {
+    const t0 = Date.now();
     const target = Number(p.profile?.dailyCalorieGoal) || 2000;
-    const out = await callGroq({
-      models: TEXT_MODELS, temperature: 0.5, maxTokens: 3500,
-      messages: [
-        { role: "system", content: `${PERSONA} Você monta planos alimentares práticos, com comida brasileira do dia a dia e quantidades caseiras + gramas.` },
-        { role: "user", content:
-          `Monte um plano alimentar para a semana.\nPerfil:\n${profileText(p.profile)}\n` +
-          `Cada dia deve somar ${target} kcal (tolerância de 3%). 5 refeições: Café da Manhã, Lanche da Manhã, Almoço, Lanche da Tarde, Jantar. ` +
-          "Para cada refeição dê 3 opções DIFERENTES e intercambiáveis (com mais ou menos as mesmas calorias), para variar ao longo da semana. " +
-          "Cada opção com quantidades (ex: '2 ovos mexidos + 1 pão francês (50 g)') e seus valores.\n" +
-          'Responda APENAS com JSON: {"macros": {"protein": number, "carbs": number, "fat": number}, ' +
-          '"meals": [{"name": string, "time": "HH:MM", "options": [{"text": string, "kcal": number, "protein": number, "carbs": number, "fat": number}]}], ' +
-          '"tips": [string, string, string, string]}  (macros do dia em gramas)' },
-      ],
-    });
-    const meals = (Array.isArray(out?.meals) ? out.meals : []).slice(0, 7).map((m) => {
+    const SLOTS = [["Café da Manhã", "07:30", 0.22], ["Lanche da Manhã", "10:30", 0.10], ["Almoço", "12:30", 0.32], ["Lanche da Tarde", "16:00", 0.10], ["Jantar", "19:30", 0.26]];
+    const slotKcal = SLOTS.map(([nm, t, f]) => [nm, t, Math.round(target * f)]);
+    const base = [
+      { role: "system", content: `${PERSONA} Você monta planos alimentares práticos, com comida brasileira do dia a dia e quantidades caseiras + gramas.` },
+      { role: "user", content:
+        `Monte um plano alimentar para a semana.\nPerfil:\n${profileText(p.profile)}\n` +
+        `Meta do dia: ${target} kcal. Use EXATAMENTE estas refeições, horários e calorias-alvo (cada opção deve ficar a no máximo 5% do alvo da refeição): ` +
+        slotKcal.map(([nm, t, k]) => `${nm} ${t} = ${k} kcal`).join("; ") + ". " +
+        "Para cada refeição dê 3 opções DIFERENTES e intercambiáveis, para variar ao longo da semana. " +
+        "Cada opção com quantidades (ex: '2 ovos mexidos + 1 pão francês (50 g)') e seus valores. Ajuste as quantidades para bater as calorias.\n" +
+        'Responda APENAS com JSON: {"macros": {"protein": number, "carbs": number, "fat": number}, ' +
+        '"meals": [{"name": string, "time": "HH:MM", "options": [{"text": string, "kcal": number, "protein": number, "carbs": number, "fat": number}]}], ' +
+        '"tips": [string, string, string, string]}  (macros do dia em gramas)' },
+    ];
+    const shape = (out) => (Array.isArray(out?.meals) ? out.meals : []).slice(0, 7).map((m) => {
       const options = (Array.isArray(m?.options) ? m.options : []).slice(0, 4).map((o) => ({
         text: s(o?.text, 220), kcal: Math.round(n(o?.kcal)), protein: Math.round(n(o?.protein)), carbs: Math.round(n(o?.carbs)), fat: Math.round(n(o?.fat)),
       })).filter((o) => o.text);
       const avg = options.length ? Math.round(options.reduce((a, o) => a + o.kcal, 0) / options.length) : 0;
       return { name: s(m?.name || "Refeição", 40), time: s(m?.time || "", 5), calories: avg, options, suggestions: options.map((o) => o.text) };
     }).filter((m) => m.options.length);
+    let out = await callGroq({ models: TEXT_MODELS, temperature: 0.4, maxTokens: 3500, messages: base });
+    let meals = shape(out);
+    const total = (ms) => ms.reduce((a, m) => a + m.calories, 0);
+    let sum = total(meals);
+    // Conferência: se a soma fugir mais de 4% da meta e ainda houver tempo, pede um ajuste
+    if (meals.length && Math.abs(sum - target) / target > 0.04 && Date.now() - t0 < 4500) {
+      try {
+        const fix = await callGroq({
+          models: TEXT_MODELS, temperature: 0.2, maxTokens: 3500,
+          messages: [...base, { role: "assistant", content: JSON.stringify(out) },
+            { role: "user", content: `A média das opções soma ${sum} kcal por dia, mas a meta é ${target} kcal. Ajuste as QUANTIDADES (e os valores) das opções para que cada refeição fique no alvo indicado. Responda com o JSON completo no mesmo formato.` }],
+        });
+        const meals2 = shape(fix);
+        if (meals2.length && Math.abs(total(meals2) - target) < Math.abs(sum - target)) { out = fix; meals = meals2; sum = total(meals2); }
+      } catch (e) { console.warn("[ai] ajuste do plano falhou", e?.message); }
+    }
     return {
-      dailyCalories: target,
+      dailyCalories: target, planTotal: sum,
       macros: { protein: Math.round(n(out?.macros?.protein)), carbs: Math.round(n(out?.macros?.carbs)), fat: Math.round(n(out?.macros?.fat)) },
       meals, tips: list(out?.tips, 6),
     };
@@ -412,6 +532,25 @@ const TASKS = {
           `Perfil:\n${profileText(p.profile)}\nÁgua hoje: ${Number(p.waterMl) || 0} ml de ${Number(p.waterGoalMl) || 0} ml.\nHorário atual: ${s(p.now, 5)}.\n` +
           `Refeições de hoje: ${JSON.stringify(meals)}\n` +
           "Avalie o dia em 1 parágrafo curto (máx. 3 frases): o que está bom, o que corrigir e o que fazer nas próximas refeições." },
+      ],
+    });
+  },
+
+  async weeklyReport(p) {
+    const st = p.stats || {};
+    const days = Array.isArray(st.days) ? st.days.slice(0, 7).map((d) => ({ dia: s(d.label, 12), kcal: Math.round(n(d.kcal)), refeicoes: Math.round(n(d.meals)), agua_ml: Math.round(n(d.water)) })) : [];
+    return callGroq({
+      models: TEXT_MODELS, temperature: 0.4, maxTokens: 900,
+      messages: [
+        { role: "system", content: `${PERSONA} Responda APENAS com JSON: {"headline": string (até 8 palavras), "summary": string (2-3 frases), "wins": [string, string], "fixes": [string, string], "focus": string (1 meta concreta para a próxima semana)}.` },
+        { role: "user", content:
+          `Perfil:\n${profileText(p.profile)}\n` +
+          `Semana de ${s(st.from, 10)} a ${s(st.to, 10)}. Dias: ${JSON.stringify(days)}\n` +
+          `Média de calorias nos dias com registro: ${Math.round(n(st.avgKcal))} kcal (meta ${Math.round(n(st.goal))}). Dias dentro da meta (±10%): ${Math.round(n(st.daysOnTarget))}/7. ` +
+          `Dias sem registro: ${Math.round(n(st.daysEmpty))}. Média de água: ${Math.round(n(st.avgWater))} ml (meta ${Math.round(n(st.waterGoal))} ml). ` +
+          `Proteína média: ${Math.round(n(st.avgProtein))} g. Variação de peso na semana: ${st.weightChange == null ? "sem pesagem" : n(st.weightChange).toFixed(1) + " kg"}. ` +
+          `Alimentos mais frequentes: ${list(st.topFoods, 8).join(", ") || "—"}.\n` +
+          "Faça o relatório semanal: o que foi bem, o que corrigir e um foco para a próxima semana. Seja justa: reconheça o progresso." },
       ],
     });
   },
@@ -459,7 +598,13 @@ const TASKS = {
 // ---------- handler ----------
 export default async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { status: 204 });
-  if (req.method === "GET") return json(200, { ok: true, foods: FOODS.length });
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    if (url.searchParams.has("foods")) {
+      return new Response(JSON.stringify({ foods: ALL_FOODS }), { status: 200, headers: { "content-type": "application/json; charset=utf-8", "cache-control": "public, max-age=86400" } });
+    }
+    return json(200, { ok: true, foods: ALL_FOODS.length });
+  }
   if (req.method !== "POST") return json(405, { error: "Use POST" });
   let body;
   try { body = await req.json(); } catch { return json(400, { error: "JSON inválido" }); }
