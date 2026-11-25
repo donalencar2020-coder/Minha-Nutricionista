@@ -1,5 +1,5 @@
 // NutriTrack — service worker: app instalável, abre offline e mostra notificações
-const VERSION = "nt-2.1";
+const VERSION = "nt-2.2";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icons/icon-192.png", "/icons/icon-512.png"];
 const CDN = ["https://unpkg.com/", "https://www.gstatic.com/firebasejs/", "https://fonts.googleapis.com/", "https://fonts.gstatic.com/"];
 

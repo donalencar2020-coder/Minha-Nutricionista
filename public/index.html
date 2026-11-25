@@ -113,6 +113,7 @@ img{display:block;max-width:100%}
 .btn-gr{background:var(--gr);color:#fff} .btn-gr:hover{background:var(--gr2)}
 .btn-bl{background:var(--bl);color:#fff} .btn-bl-soft{background:#fff;color:var(--bl);box-shadow:0 1px 2px rgba(0,0,0,.05)}
 .btn-block{width:100%}
+.grid2>.btn,.grid3>.btn{white-space:normal;text-align:center;line-height:1.2}
 .btn-lg{padding:16px 22px;font-size:16px;border-radius:20px;min-height:56px}
 .btn-sm{padding:8px 12px;font-size:13px;min-height:36px;border-radius:12px}
 .icon-btn{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;color:var(--muted)}
@@ -262,10 +263,11 @@ import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/fireba
 import {
   getAuth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword,
   sendPasswordResetEmail, updateProfile, signOut, setPersistence, browserLocalPersistence,
+  deleteUser, EmailAuthProvider, reauthenticateWithCredential,
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
 import {
   initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore,
-  doc, collection, query, where, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDoc, deleteField,
+  doc, collection, query, where, onSnapshot, addDoc, setDoc, updateDoc, deleteDoc, getDoc, getDocs, deleteField,
 } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-firestore.js";
 
 // ---------------------------------------------------------------------
@@ -281,7 +283,7 @@ const firebaseConfig = {
 };
 const FIRESTORE_DB_ID = "ai-studio-2948fa06-021f-4fbb-9b6e-d240f774a5ec";
 const AI_ENDPOINT = "/api/ai"; // Netlify Function (netlify/functions/ai.mjs)
-const APP_VERSION = "2.1";
+const APP_VERSION = "2.2";
 
 const fbApp = initializeApp(firebaseConfig);
 const auth = getAuth(fbApp);
@@ -858,7 +860,7 @@ function ItemsEditor({ items, onChange }) {
     ${items.map((it, i) => html`<div class="item-row" key=${i}>
       <div class="grow" style="min-width:0">
         <div class="b small trunc">${it.name}</div>
-        <div class="tiny muted2">${it.source === "tabela" ? "Tabela TACO" : it.source === "manual" ? "Adicionado por você" : "Estimativa da IA"} · ${Math.round(num(it.per100?.kcal))} kcal/100g</div>
+        <div class="tiny muted2">${it.source === "tabela" ? "Tabela TACO" : it.source === "rotulo" ? "Rótulo do produto" : it.source === "manual" ? "Adicionado por você" : "Estimativa da IA"} · ${Math.round(num(it.per100?.kcal))} kcal/100g</div>
       </div>
       <div class="qty">
         <button type="button" onClick=${() => setG(i, Math.max(0, int(it.grams) - 10))} aria-label="Menos 10 gramas"><${Icon} n="minus" s=${14} /></button>
@@ -1009,6 +1011,322 @@ function DisclaimerModal({ user, onClose }) {
 }
 
 // ---------------------------------------------------------------------
+// v2.2 — busca de alimentos, código de barras, relatório semanal, conta (LGPD)
+// ---------------------------------------------------------------------
+const portionGrams = (hint) => { const m = String(hint || "").match(/=\s*([\d.,]+)\s*(g|ml)/i); return m ? Math.round(num(m[1])) : 0; };
+async function loadFoods() {
+  const cached = store.get("foods_v2", null);
+  if (cached && cached.length) return cached;
+  const r = await fetch(AI_ENDPOINT + "?foods=1");
+  if (!r.ok) throw new Error("Não foi possível carregar a tabela de alimentos.");
+  const d = await r.json();
+  store.set("foods_v2", d.foods);
+  return d.foods;
+}
+const foodToItem = (f, grams) => recalcItem({ name: f[0], ref: f[0], source: "tabela", grams: 0, per100: { kcal: f[1], protein: f[2], carbs: f[3], fat: f[4] }, kcal: 0, protein: 0, carbs: 0, fat: 0 }, grams);
+
+function FoodSearchModal({ onAdd, onClose }) {
+  const [foods, setFoods] = useState(null);
+  const [err, setErr] = useState(null);
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(null);
+  const [grams, setGrams] = useState("");
+  const [added, setAdded] = useState(0);
+  useEffect(() => { loadFoods().then(setFoods).catch((e) => setErr(e.message)); }, []);
+  const results = useMemo(() => {
+    if (!foods) return [];
+    const words = q.split(/\s+/).map(normKey).filter(Boolean);
+    const list = words.length ? foods.filter((f) => { const k = normKey(f[0]); return words.every((w) => k.includes(w)); }) : foods;
+    return list.slice(0, 40);
+  }, [q, foods]);
+  const pick = (f) => { setSel(f); setGrams(String(portionGrams(f[5]) || 100)); };
+  const add = () => {
+    const g = int(grams); if (!sel || !g) return;
+    onAdd([foodToItem(sel, g)]); setAdded(added + 1); setSel(null); setQ("");
+    toast(`${sel[0]} adicionado`);
+  };
+  return html`<${Modal} onClose=${onClose} title="Buscar alimento">
+    <div class="stack">
+      ${err && html`<div class="err"><${Icon} n="alert" s=${18} />${err}</div>`}
+      ${sel ? html`<div class="stack">
+          <div class="card-or"><div class="b">${sel[0]}</div><div class="tiny muted">${sel[1]} kcal · P ${sel[2]}g · C ${sel[3]}g · G ${sel[4]}g por 100 g${sel[5] ? " · " + sel[5] : ""}</div></div>
+          <div><label class="label">Quantidade (g ou ml)</label><input class="input" type="number" inputmode="numeric" min="1" value=${grams} onInput=${(e) => setGrams(e.target.value)} autofocus /></div>
+          <div class="wrap-row">${[portionGrams(sel[5]), 50, 100, 150, 200].filter((v, i, a) => v && a.indexOf(v) === i).map((v) => html`<button class="chip" onClick=${() => setGrams(String(v))}>${v} g${v === portionGrams(sel[5]) ? " (1 porção)" : ""}</button>`)}</div>
+          <div class="tile small">Total: <b class="num">${Math.round(sel[1] * int(grams) / 100)} kcal</b></div>
+          <div class="grid2"><button class="btn btn-soft" onClick=${() => setSel(null)}>Voltar</button><button class="btn btn-or" onClick=${add}><${Icon} n="plus" s=${18} />Adicionar</button></div>
+        </div>`
+        : html`<input class="input" value=${q} onInput=${(e) => setQ(e.target.value)} placeholder="Ex: arroz, frango, banana..." autofocus />
+          ${!foods && !err ? html`<div class="center"><${Spinner} c="or" /></div>`
+            : results.length === 0 ? html`<p class="small muted">Nada encontrado. Tente outro nome ou use a análise por IA.</p>`
+            : html`<div class="stack" style="gap:6px;max-height:50vh;overflow:auto">${results.map((f) => html`<button class="list-check" style="justify-content:space-between" onClick=${() => pick(f)}>
+                <span class="txt" style="text-align:left">${f[0]}${f[5] ? html`<span class="tiny muted2" style="display:block;font-weight:600">${f[5]}</span>` : null}</span><span class="tiny muted b num" style="white-space:nowrap">${f[1]} kcal/100g</span></button>`)}</div>`}
+          ${added > 0 && html`<button class="btn btn-dark btn-block" onClick=${onClose}><${Icon} n="check" s=${18} />Concluir (${added} adicionado${added > 1 ? "s" : ""})</button>`}`}
+      <p class="tiny muted">Valores de referência baseados na Tabela Brasileira de Composição de Alimentos (TACO) e em médias de rótulos.</p>
+    </div>
+  <//>`;
+}
+
+async function lookupBarcode(code) {
+  const r = await fetch(`https://world.openfoodfacts.org/api/v2/product/${encodeURIComponent(code)}.json`);
+  if (!r.ok) throw new Error("Produto não encontrado na base Open Food Facts.");
+  const d = await r.json();
+  const p = d?.product;
+  if (!d || d.status !== 1 || !p) throw new Error("Produto não encontrado na base Open Food Facts.");
+  const nu = p.nutriments || {};
+  const kcal = num(nu["energy-kcal_100g"]) || num(nu["energy_100g"]) / 4.184;
+  if (!kcal && !num(nu.proteins_100g) && !num(nu.carbohydrates_100g)) throw new Error("Este produto está cadastrado sem tabela nutricional.");
+  const name = [p.product_name_pt || p.product_name, p.brands?.split(",")[0]].filter(Boolean).join(" · ") || "Produto " + code;
+  return {
+    name: str(name, 60), ref: null, source: "rotulo", code, grams: 0, kcal: 0, protein: 0, carbs: 0, fat: 0,
+    per100: { kcal: Math.round(kcal * 10) / 10, protein: num(nu.proteins_100g), carbs: num(nu.carbohydrates_100g), fat: num(nu.fat_100g) },
+    serving: Math.round(num(p.serving_quantity)) || 0, servingLabel: str(p.serving_size || "", 40),
+  };
+}
+
+function BarcodeModal({ onAdd, onClose }) {
+  const vid = useRef(null);
+  const stopRef = useRef(() => {});
+  const [mode, setMode] = useState("scan"); // scan | manual | found
+  const [camErr, setCamErr] = useState(null);
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [item, setItem] = useState(null);
+  const [grams, setGrams] = useState("");
+
+  const found = async (c) => {
+    stopRef.current();
+    setBusy(true); setErr(null); setCode(c);
+    try { const it = await lookupBarcode(c); setItem(it); setGrams(String(it.serving || 100)); setMode("found"); }
+    catch (e) { setErr(e.message); setMode("manual"); }
+    finally { setBusy(false); }
+  };
+
+  useEffect(() => {
+    if (mode !== "scan") return;
+    let stopped = false, stream = null, raf = 0, zxControls = null;
+    stopRef.current = () => { stopped = true; cancelAnimationFrame(raf); stream?.getTracks().forEach((t) => t.stop()); try { zxControls?.stop(); } catch {} };
+    (async () => {
+      try {
+        if ("BarcodeDetector" in window) {
+          const det = new window.BarcodeDetector({ formats: ["ean_13", "ean_8", "upc_a", "upc_e", "code_128"] });
+          stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" }, audio: false });
+          if (stopped) return stream.getTracks().forEach((t) => t.stop());
+          vid.current.srcObject = stream; await vid.current.play().catch(() => {});
+          const loop = async () => {
+            if (stopped) return;
+            try { const res = await det.detect(vid.current); if (res && res[0]?.rawValue) return found(res[0].rawValue); } catch {}
+            raf = requestAnimationFrame(loop);
+          };
+          loop();
+        } else {
+          const { BrowserMultiFormatReader } = await import("https://esm.sh/@zxing/browser@0.1.5");
+          if (stopped) return;
+          const reader = new BrowserMultiFormatReader();
+          zxControls = await reader.decodeFromVideoDevice(undefined, vid.current, (res) => { if (res && !stopped) found(res.getText()); });
+        }
+      } catch (e) {
+        if (!stopped) setCamErr(e?.name === "NotAllowedError" ? "Permissão de câmera negada." : "Não foi possível ler pela câmera neste aparelho.");
+      }
+    })();
+    return () => stopRef.current();
+  }, [mode]);
+
+  const add = () => { const g = int(grams); if (!item || !g) return; onAdd([recalcItem(item, g)]); toast(`${item.name} adicionado`); onClose(); };
+
+  return html`<${Modal} onClose=${() => { stopRef.current(); onClose(); }} title="Código de barras">
+    <div class="stack">
+      ${mode === "scan" && html`
+        ${camErr ? html`<div class="note"><${Icon} n="alert" s=${18} /><div>${camErr} Digite o código abaixo.</div></div>`
+          : html`<div class="camera-view" style="border-radius:20px;overflow:hidden;aspect-ratio:4/3"><video ref=${vid} playsinline muted autoplay></video>
+              <div style="position:absolute;left:10%;right:10%;top:45%;height:2px;background:#f97316;box-shadow:0 0 12px #f97316"></div></div>
+            <p class="small muted center">Aponte a câmera para o código de barras da embalagem.</p>`}
+        <button class="btn btn-soft btn-block" onClick=${() => { stopRef.current(); setMode("manual"); }}>Digitar o código</button>`}
+      ${mode === "manual" && html`<form class="stack" onSubmit=${(e) => { e.preventDefault(); const c = code.replace(/\D/g, ""); if (c.length >= 8) found(c); }}>
+          ${err && html`<div class="err"><${Icon} n="alert" s=${18} />${err}</div>`}
+          <div><label class="label">Código de barras (números)</label><input class="input" inputmode="numeric" value=${code} onInput=${(e) => setCode(e.target.value)} placeholder="Ex: 7891000100103" autofocus /></div>
+          <button class="btn btn-dark btn-block" disabled=${busy}>${busy ? html`<${Spinner} />` : "Buscar produto"}</button>
+          <button type="button" class="btn btn-ghost btn-block" onClick=${() => { setErr(null); setCamErr(null); setMode("scan"); }}>Usar a câmera</button>
+        </form>`}
+      ${mode === "found" && item && html`<div class="stack">
+          <div class="card-or"><div class="b">${item.name}</div><div class="tiny muted">${Math.round(item.per100.kcal)} kcal · P ${item.per100.protein}g · C ${item.per100.carbs}g · G ${item.per100.fat}g por 100 g${item.servingLabel ? " · porção: " + item.servingLabel : ""}</div></div>
+          <div><label class="label">Quanto você comeu (g ou ml)</label><input class="input" type="number" inputmode="numeric" min="1" value=${grams} onInput=${(e) => setGrams(e.target.value)} /></div>
+          <div class="wrap-row">${[item.serving, 30, 50, 100, 200].filter((v, i, a) => v && a.indexOf(v) === i).map((v) => html`<button class="chip" onClick=${() => setGrams(String(v))}>${v} g${v === item.serving ? " (1 porção)" : ""}</button>`)}</div>
+          <div class="tile small">Total: <b class="num">${Math.round(item.per100.kcal * int(grams) / 100)} kcal</b></div>
+          <button class="btn btn-or btn-block" onClick=${add}><${Icon} n="plus" s=${18} />Adicionar à refeição</button>
+        </div>`}
+      ${busy && mode !== "manual" && html`<div class="center"><${Spinner} c="or" /> Buscando produto...</div>`}
+      <p class="tiny muted">Dados do rótulo pela base colaborativa Open Food Facts. Confira com a embalagem.</p>
+    </div>
+  <//>`;
+}
+
+// ---- Relatório semanal ----
+function weekStats({ meals, water, weights, profile }) {
+  const goal = int(profile.dailyCalorieGoal) || calcGoals(profile).kcal;
+  const waterGoal = int(profile.waterGoalMl) || calcGoals(profile).waterMl;
+  const days = [];
+  for (let i = 7; i >= 1; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const k = dayKey(d);
+    const dm = meals.filter((m) => dayKeyOf(m.timestamp) === k);
+    days.push({
+      key: k, label: `${weekday(d)} ${d.getDate()}`, meals: dm.length,
+      kcal: dm.reduce((a, m) => a + int(m.calories), 0), protein: dm.reduce((a, m) => a + int(m.protein), 0),
+      water: water.filter((w) => dayKeyOf(w.timestamp) === k).reduce((a, w) => a + num(w.amount), 0),
+    });
+  }
+  const logged = days.filter((d) => d.meals > 0);
+  const avg = (arr, f) => (arr.length ? Math.round(arr.reduce((a, x) => a + f(x), 0) / arr.length) : 0);
+  const fromT = new Date(days[0].key + "T00:00:00"), toT = new Date(days[6].key + "T23:59:59");
+  const ws = weights.filter((w) => { const t = new Date(w.timestamp); return t >= new Date(fromT.getTime() - 864e5) && t <= toT; });
+  const count = new Map();
+  meals.filter((m) => { const t = new Date(m.timestamp); return t >= fromT && t <= toT; }).forEach((m) => { const nm = String(m.foodName || "").split(":").pop().trim(); if (nm) count.set(nm, (count.get(nm) || 0) + 1); });
+  return {
+    from: days[0].key, to: days[6].key, goal, waterGoal, days,
+    avgKcal: avg(logged, (d) => d.kcal), avgProtein: avg(logged, (d) => d.protein), avgWater: avg(days, (d) => d.water),
+    daysOnTarget: logged.filter((d) => Math.abs(d.kcal - goal) <= goal * 0.1).length, daysEmpty: 7 - logged.length,
+    weightChange: ws.length >= 2 ? Math.round((num(ws[ws.length - 1].weight) - num(ws[0].weight)) * 10) / 10 : null,
+    topFoods: [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6).map(([k]) => k),
+  };
+}
+
+function ReportView({ r }) {
+  const st = r.stats || {};
+  return html`<div class="stack" style="gap:10px">
+    <div><div class="h3">${r.headline}</div><div class="tiny muted2 b">${fmtDate(st.from + "T12:00:00", { day: "numeric", month: "short" })} a ${fmtDate(st.to + "T12:00:00", { day: "numeric", month: "short" })}</div></div>
+    <div class="grid4">
+      <${MacroTile} label="Média" value=${int(st.avgKcal)} unit="kcal" />
+      <${MacroTile} label="Na meta" value=${`${int(st.daysOnTarget)}/7`} unit="" color="gr" />
+      <${MacroTile} label="Água" value=${(num(st.avgWater) / 1000).toFixed(1)} unit="L" color="bl" />
+      <${MacroTile} label="Peso" value=${st.weightChange == null ? "—" : (st.weightChange > 0 ? "+" : "") + fmtKg(st.weightChange)} unit=${st.weightChange == null ? "" : "kg"} color=${st.weightChange < 0 ? "gr" : st.weightChange > 0 ? "rd" : ""} />
+    </div>
+    <p class="small" style="color:#334155">${r.summary}</p>
+    ${r.wins?.length > 0 && html`<div class="stack" style="gap:4px">${r.wins.map((w) => html`<div class="row small" style="align-items:flex-start;gap:8px"><${Icon} n="check" s=${16} c="gr" /><span>${w}</span></div>`)}</div>`}
+    ${r.fixes?.length > 0 && html`<div class="stack" style="gap:4px">${r.fixes.map((w) => html`<div class="row small" style="align-items:flex-start;gap:8px"><${Icon} n="alert" s=${16} c="or" /><span>${w}</span></div>`)}</div>`}
+    ${r.focus && html`<div class="card-or small"><b class="or">Foco da semana: </b>${r.focus}</div>`}
+  </div>`;
+}
+
+function WeeklyReportCard({ user, profile, meals, water, weights, reports }) {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [all, setAll] = useState(false);
+  const latest = reports[0];
+  const fresh = latest && (Date.now() - new Date(latest.createdAt).getTime()) < 6 * 864e5;
+  const hasData = meals.some((m) => (Date.now() - new Date(m.timestamp).getTime()) < 8 * 864e5);
+  const gen = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const stats = weekStats({ meals, water, weights, profile });
+      const r = await ai("weeklyReport", { profile: profileForAI(profile), stats: { ...stats, days: stats.days.map((d) => ({ label: d.label, kcal: d.kcal, meals: d.meals, water: d.water })) } });
+      await addDoc(collection(db, "reports"), clean({
+        uid: user.uid, stats: { ...stats, days: stats.days.map(({ key, label, kcal, meals: mm, water: wa }) => ({ key, label, kcal, meals: mm, water: wa })) },
+        headline: str(r?.headline || "Sua semana", 80), summary: str(r?.summary, 600), wins: strList(r?.wins, 3), fixes: strList(r?.fixes, 3), focus: str(r?.focus, 200),
+        createdAt: new Date().toISOString(),
+      }));
+      toast("Relatório da semana pronto!");
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return html`<div class="card stack">
+    <div class="between" style="flex-wrap:wrap">
+      <div class="row"><div class="icon-box ib-gr"><${Icon} n="clipboard" s=${20} /></div><div><div class="h2">Relatório semanal</div><div class="small muted2">Avaliação dos últimos 7 dias pela Nutri</div></div></div>
+      ${(!fresh || !latest) && hasData && html`<button class="btn btn-dark btn-sm" disabled=${busy} onClick=${gen}>${busy ? html`<${Spinner} s=${16} />Analisando...` : html`<${Icon} n="sparkles" s=${16} c="or" />Gerar relatório`}</button>`}
+    </div>
+    ${err && html`<div class="err"><${Icon} n="alert" s=${18} />${err}</div>`}
+    ${latest ? html`<${ReportView} r=${latest} />` : html`<p class="small muted">${hasData ? "Gere seu primeiro relatório para ver como foi a semana." : "Registre suas refeições durante a semana para receber o relatório."}</p>`}
+    ${fresh && html`<p class="tiny muted">Um novo relatório fica disponível a cada 7 dias.</p>`}
+    ${reports.length > 1 && html`<button class="link" style="align-self:flex-start" onClick=${() => setAll(true)}>Ver relatórios anteriores (${reports.length - 1}) <${Icon} n="arrow" s=${14} /></button>`}
+    ${all && html`<${Modal} onClose=${() => setAll(false)} title="Relatórios anteriores" wide><div class="stack-lg">${reports.slice(1).map((r) => html`<div class="card tight" key=${r.id}><${ReportView} r=${r} /></div>`)}</div><//>`}
+  </div>`;
+}
+
+// ---- Conta: baixar dados e excluir (LGPD) ----
+const USER_COLLECTIONS = ["meals", "mealPhotos", "waterLogs", "dietPlans", "weightLogs", "recipes", "reports"];
+const USER_DOCS = ["users", "aiState", "shoppingLists", "pantry"];
+async function fetchAllUserData(uid, { withPhotos = false } = {}) {
+  const out = {};
+  for (const c of USER_COLLECTIONS) {
+    if (c === "mealPhotos" && !withPhotos) continue;
+    const snap = await getDocs(query(collection(db, c), where("uid", "==", uid)));
+    out[c] = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  }
+  for (const c of USER_DOCS) { const s = await getDoc(doc(db, c, uid)); out[c] = s.exists() ? s.data() : null; }
+  return out;
+}
+function downloadFile(name, content, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }));
+  const a = document.createElement("a"); a.href = url; a.download = name; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1000);
+}
+
+function AccountCard({ user }) {
+  const [busy, setBusy] = useState(null);
+  const [del, setDel] = useState(false);
+  const exportData = async () => {
+    setBusy("export");
+    try {
+      const data = await fetchAllUserData(user.uid);
+      (data.meals || []).forEach((m) => { delete m.thumb; if (m.imageUrl && m.imageUrl.length > 200) m.imageUrl = "(imagem omitida)"; });
+      const stamp = dayKey();
+      downloadFile(`nutritrack-dados-${stamp}.json`, JSON.stringify({ exportadoEm: new Date().toISOString(), conta: { email: user.email, uid: user.uid }, ...data }, null, 2), "application/json");
+      const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const rows = [["data", "hora", "refeicao", "alimento", "kcal", "proteina_g", "carboidrato_g", "gordura_g"].join(";"),
+        ...(data.meals || []).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)).map((m) => [dayKeyOf(m.timestamp), hhmm(m.timestamp), esc(m.mealType), esc(m.foodName), int(m.calories), int(m.protein), int(m.carbs), int(m.fat)].join(";"))];
+      downloadFile(`nutritrack-refeicoes-${stamp}.csv`, "﻿" + rows.join("\n"), "text/csv;charset=utf-8");
+      toast("Arquivos baixados!");
+    } catch (e) { console.error(e); toast("Não foi possível exportar.", "err"); } finally { setBusy(null); }
+  };
+  return html`<div class="card stack" style="max-width:720px;margin:0 auto 20px">
+    ${del && html`<${DeleteAccountModal} user=${user} onClose=${() => setDel(false)} />`}
+    <div class="row"><div class="icon-box ib-soft"><${Icon} n="shield" s=${20} /></div><div><div class="h2">Seus dados</div><div class="small muted2">Você é dono(a) dos seus dados (LGPD)</div></div></div>
+    <button class="btn btn-soft btn-block" disabled=${!!busy} onClick=${exportData}>${busy === "export" ? html`<${Spinner} />Preparando...` : html`<${Icon} n="upload" s=${18} />Baixar meus dados (JSON + planilha CSV)`}</button>
+    <button class="btn btn-red btn-block" onClick=${() => setDel(true)}><${Icon} n="trash" s=${18} />Excluir minha conta e todos os dados</button>
+  </div>`;
+}
+
+function DeleteAccountModal({ user, onClose }) {
+  const [pass, setPass] = useState("");
+  const [confirmTxt, setConfirmTxt] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState(null);
+  const [step, setStep] = useState("");
+  const isPassword = (user.providerData || []).some((p) => p.providerId === "password");
+  const go = async (e) => {
+    e.preventDefault();
+    if (confirmTxt.trim().toUpperCase() !== "EXCLUIR") { setErr('Digite EXCLUIR para confirmar.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      if (isPassword) { setStep("Confirmando sua senha..."); await reauthenticateWithCredential(user, EmailAuthProvider.credential(user.email, pass)); }
+      setStep("Apagando seus dados...");
+      for (const c of USER_COLLECTIONS) {
+        const snap = await getDocs(query(collection(db, c), where("uid", "==", user.uid)));
+        await Promise.all(snap.docs.map((d) => deleteDoc(d.ref)));
+      }
+      for (const c of USER_DOCS) await deleteDoc(doc(db, c, user.uid)).catch(() => {});
+      setStep("Excluindo sua conta...");
+      await deleteUser(user);
+      try { localStorage.clear(); } catch {}
+      toast("Conta e dados excluídos. Até logo!");
+    } catch (ex) {
+      console.error(ex);
+      setErr(ex.code === "auth/invalid-credential" || ex.code === "auth/wrong-password" ? "Senha incorreta." : ex.code === "auth/requires-recent-login" ? "Por segurança, saia e entre de novo antes de excluir." : "Não foi possível concluir. Tente novamente.");
+      setBusy(false); setStep("");
+    }
+  };
+  return html`<${Modal} onClose=${busy ? null : onClose} title="Excluir conta">
+    <form class="stack" onSubmit=${go}>
+      <div class="err" style="align-items:flex-start"><${Icon} n="alert" s=${18} /><div>Isto apaga <b>definitivamente</b> sua conta e todos os seus dados: refeições, fotos, pesagens, planos, receitas, listas e relatórios. <b>Não dá para desfazer.</b> Se quiser guardar, use antes "Baixar meus dados".</div></div>
+      ${isPassword && html`<div><label class="label"><${Icon} n="lock" s=${13} />Sua senha</label><input class="input" type="password" value=${pass} onInput=${(e) => setPass(e.target.value)} autocomplete="current-password" required /></div>`}
+      <div><label class="label">Digite EXCLUIR para confirmar</label><input class="input" value=${confirmTxt} onInput=${(e) => setConfirmTxt(e.target.value)} placeholder="EXCLUIR" /></div>
+      ${err && html`<div class="err"><${Icon} n="alert" s=${18} />${err}</div>`}
+      ${step && html`<div class="row small muted"><${Spinner} s=${16} />${step}</div>`}
+      <div class="grid2"><button type="button" class="btn btn-soft" disabled=${busy} onClick=${onClose}>Cancelar</button><button class="btn btn-red solid" disabled=${busy}>Excluir tudo</button></div>
+    </form>
+  <//>`;
+}
+
+// ---------------------------------------------------------------------
 // Resumo (Dashboard)
 // ---------------------------------------------------------------------
 function Ring({ pct, size = 150, stroke = 12, color = "#f97316" }) {
@@ -1084,7 +1402,7 @@ function MealRow({ meal, onClick, showDate }) {
   </button>`;
 }
 
-function Dashboard({ user, profile, aiState, meals, water, plan, weights, go, openMeal, openHistory, openWeight }) {
+function Dashboard({ user, profile, aiState, meals, water, plan, weights, reports, go, openMeal, openHistory, openWeight }) {
   const goal = int(profile.dailyCalorieGoal) || calcGoals(profile).kcal;
   const waterGoal = int(profile.waterGoalMl) || calcGoals(profile).waterMl;
   const today = meals.filter((m) => isToday(m.timestamp));
@@ -1137,6 +1455,21 @@ function Dashboard({ user, profile, aiState, meals, water, plan, weights, go, op
   const lastW = weights.length ? weights[weights.length - 1] : null;
   const firstW = weights.length ? weights[0] : null;
   const wDiff = lastW && firstW ? Math.round((num(lastW.weight) - num(firstW.weight)) * 10) / 10 : 0;
+
+  const yKey = (() => { const d = new Date(); d.setDate(d.getDate() - 1); return dayKey(d); })();
+  const yesterday = meals.filter((m) => dayKeyOf(m.timestamp) === yKey).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+  const copyYesterday = async () => {
+    const tot = yesterday.reduce((a, m) => a + int(m.calories), 0);
+    if (!(await confirmAsk({ title: "Repetir o dia de ontem?", text: `${yesterday.length} refeição(ões) de ontem (${tot} kcal) serão copiadas para hoje, nos mesmos horários. Depois você pode editar ou excluir.`, ok: "Copiar" }))) return;
+    try {
+      await Promise.all(yesterday.map((m) => {
+        const t = new Date(m.timestamp); const now = new Date(); now.setHours(t.getHours(), t.getMinutes(), 0, 0);
+        const { id, ...rest } = m;
+        return addDoc(collection(db, "meals"), clean({ ...rest, uid: user.uid, favorite: false, source: "copy", timestamp: now.toISOString() }));
+      }));
+      toast("Dia de ontem copiado!");
+    } catch { toast("Não foi possível copiar.", "err"); }
+  };
 
   const status = pct > 105 ? ["Limite excedido!", "rd"] : pct >= 85 ? ["Na medida certa", "gr"] : ["Dentro da meta", "or"];
 
@@ -1242,9 +1575,11 @@ function Dashboard({ user, profile, aiState, meals, water, plan, weights, go, op
       <${WeekChart} meals=${meals} goal=${goal} />
     </div>
 
+    <${WeeklyReportCard} user=${user} profile=${profile} meals=${meals} water=${water} weights=${weights} reports=${reports} />
+
     <div class="stack">
       <div class="between"><div class="row"><div class="icon-box ib-or"><${Icon} n="utensils" s=${20} /></div><div class="h2">Refeições de Hoje</div></div>
-        <button class="link" onClick=${openHistory}>Histórico <${Icon} n="arrow" s=${15} /></button></div>
+        <div class="row" style="gap:14px">${yesterday.length > 0 && html`<button class="link" onClick=${copyYesterday}><${Icon} n="copy" s=${15} />Repetir ontem</button>`}<button class="link" onClick=${openHistory}>Histórico <${Icon} n="arrow" s=${15} /></button></div></div>
       ${today.length === 0
         ? html`<div class="card dashed"><${Empty} icon="utensils" title="Nenhuma refeição registrada hoje." text="Comece analisando seu primeiro prato do dia!"><button class="btn btn-or" onClick=${() => go("analisar")}><${Icon} n="camera" s=${18} />Analisar refeição</button><//></div>`
         : html`<div class="cards-grid">${today.map((m) => html`<${MealRow} key=${m.id} meal=${m} onClick=${() => openMeal(m)} />`)}</div>`}
@@ -1331,7 +1666,10 @@ function MealModal({ meal, user, meals, onClose }) {
             <button class="btn btn-soft" onClick=${() => setEdit(true)}><${Icon} n="edit" s=${18} />Editar</button>
             <button class="btn btn-soft" disabled=${busy} onClick=${repeat} title="Comi de novo"><${Icon} n="copy" s=${18} />Repetir</button>
           </div>
-          <button class="btn btn-dark btn-block" onClick=${onClose}>Fechar</button>
+          <div class="grid2">
+            <button class="btn btn-soft" onClick=${() => updateDoc(doc(db, "meals", meal.id), { favorite: !meal.favorite }).then(() => toast(meal.favorite ? "Removida das favoritas." : "Adicionada às favoritas!")).catch(() => toast("Erro ao salvar.", "err"))}>${meal.favorite ? "★ Favorita" : "☆ Favoritar"}</button>
+            <button class="btn btn-dark" onClick=${onClose}>Fechar</button>
+          </div>
         </div>`}
   <//>`;
 }
@@ -1404,7 +1742,15 @@ function Analyze({ user, profile, meals, go }) {
   const [draft, setDraft] = useState(null);
   const [saved, setSaved] = useState(null);
   const [cam, setCam] = useState(false);
+  const [search, setSearch] = useState(false);
+  const [barcode, setBarcode] = useState(false);
   const fileRef = useRef(null), capRef = useRef(null);
+  const addItems = (items) => { setSaved(null); setDraft((d) => (d ? { ...d, items: [...d.items, ...items] } : { foodName: items.map((i) => i.name).slice(0, 3).join(", "), items, analysis: "" })); };
+  const favorites = useMemo(() => {
+    const seen = new Set(), out = [];
+    for (const m of meals) { if (!m.favorite) continue; const k = (m.foodName || "").toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(m); } }
+    return out.slice(0, 12);
+  }, [meals]);
 
   const recents = useMemo(() => {
     const seen = new Set(), out = [];
@@ -1438,7 +1784,7 @@ function Analyze({ user, profile, meals, go }) {
       const totals = sumItems(draft.items);
       await saveMeal(user, {
         foodName: str(draft.foodName, 80) || "Refeição", ...totals, items: itemsForDb(draft.items), analysis: draft.analysis,
-        textDescription: text.trim() || null, source: image ? "photo" : "text",
+        textDescription: text.trim() || null, source: image ? "photo" : text.trim() ? "text" : "manual",
       }, { image });
       setSaved({ ...draft, ...totals });
       setDraft(null);
@@ -1461,6 +1807,8 @@ function Analyze({ user, profile, meals, go }) {
     <input type="file" accept="image/*" ref=${fileRef} onChange=${onFile} hidden />
     <input type="file" accept="image/*" capture="environment" ref=${capRef} onChange=${onFile} hidden />
     ${cam && html`<${CameraModal} onCapture=${(d) => { setImage(d); setDraft(null); setSaved(null); setErr(null); }} onClose=${() => setCam(false)} />`}
+    ${search && html`<${FoodSearchModal} onAdd=${addItems} onClose=${() => setSearch(false)} />`}
+    ${barcode && html`<${BarcodeModal} onAdd=${addItems} onClose=${() => setBarcode(false)} />`}
 
     <div class="card stack-lg">
       <div class="between">
@@ -1485,6 +1833,7 @@ function Analyze({ user, profile, meals, go }) {
           <div class="note" style="align-items:center"><${Icon} n="edit" s=${18} /><div><b>Confira antes de salvar.</b> Ajuste as quantidades: as calorias se recalculam na hora.</div></div>
           <div><label class="label">Nome da refeição</label><input class="input" value=${draft.foodName} onInput=${(e) => setDraft({ ...draft, foodName: e.target.value })} /></div>
           <${ItemsEditor} items=${draft.items} onChange=${(items) => setDraft({ ...draft, items })} />
+          <div class="grid2"><button class="btn btn-soft btn-sm" onClick=${() => setSearch(true)}><${Icon} n="book" s=${15} />Buscar alimento</button><button class="btn btn-soft btn-sm" onClick=${() => setBarcode(true)}><${Icon} n="box" s=${15} />Código de barras</button></div>
           <div class="grid4">
             <${MacroTile} label="Kcal" value=${totals.calories} unit="" /><${MacroTile} label="Prot" value=${totals.protein} color="or" /><${MacroTile} label="Carb" value=${totals.carbs} color="bl" /><${MacroTile} label="Gord" value=${totals.fat} color="gr" />
           </div>
@@ -1504,6 +1853,10 @@ function Analyze({ user, profile, meals, go }) {
               <button class="pick" onClick=${openCamera}><div class="icon-box ib-or" style="width:56px;height:56px;border-radius:18px"><${Icon} n="camera" s=${26} /></div><div class="b">Tirar Foto</div><div class="eyebrow">Câmera</div></button>
               <button class="pick blue" onClick=${() => fileRef.current?.click()}><div class="icon-box ib-bl" style="width:56px;height:56px;border-radius:18px"><${Icon} n="upload" s=${26} /></div><div class="b">Galeria</div><div class="eyebrow">Subir imagem</div></button>
             </div>
+            <div class="grid2">
+              <button class="btn btn-soft" onClick=${() => setSearch(true)}><${Icon} n="book" s=${18} />Buscar alimento</button>
+              <button class="btn btn-soft" onClick=${() => setBarcode(true)}><${Icon} n="box" s=${18} />Código de barras</button>
+            </div>
             <div class="divider">ou descreva</div>`}
         <div>
           ${image && html`<label class="label"><${Icon} n="message" s=${13} />Detalhes (opcional, melhora a precisão)</label>`}
@@ -1518,6 +1871,11 @@ function Analyze({ user, profile, meals, go }) {
       `}
     </div>
 
+    ${!saved && !draft && favorites.length > 0 && html`<div class="card" style="margin-top:20px">
+      <div class="h3">⭐ Suas favoritas</div>
+      <div class="small muted2" style="margin-bottom:12px">Registre com um toque.</div>
+      <div class="wrap-row">${favorites.map((m) => html`<button class="chip" onClick=${() => relog(m)}><${Icon} n="plus" s=${14} c="or" />${m.foodName} <span class="muted2">· ${int(m.calories)}</span></button>`)}</div>
+    </div>`}
     ${!saved && !draft && recents.length > 0 && html`<div class="card" style="margin-top:20px">
       <div class="h3">Comeu de novo?</div>
       <div class="small muted2" style="margin-bottom:12px">Registre com um toque, sem esperar a IA.</div>
@@ -1877,6 +2235,8 @@ function ProfileTab({ user, profile, weights, go }) {
     <${WeightSection} user=${user} profile=${profile} weights=${weights} />
     <${RemindersCard} user=${user} profile=${profile} />
     <${ProfileForm} user=${user} profile=${profile} weights=${weights} onSaved=${() => go("resumo")} />
+    <div style="height:20px"></div>
+    <${AccountCard} user=${user} />
   </div>`;
 }
 
@@ -1905,6 +2265,7 @@ function App() {
   const plansRaw = useCollection("dietPlans", uid);
   const weightsRaw = useCollection("weightLogs", uid);
   const recipesRaw = useCollection("recipes", uid);
+  const reportsRaw = useCollection("reports", uid);
   const shopping = useDocument("shoppingLists", uid);
   const pantryDoc = useDocument("pantry", uid);
 
@@ -1912,6 +2273,7 @@ function App() {
   const water = waterRaw || [];
   const weights = useMemo(() => (weightsRaw || []).filter((w) => w.timestamp && num(w.weight) > 0).sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp)), [weightsRaw]);
   const recipes = recipesRaw || [];
+  const reports = useMemo(() => (reportsRaw || []).slice().sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0)), [reportsRaw]);
   const plan = useMemo(() => {
     const p = (plansRaw || []).filter((p) => Array.isArray(p.meals) && p.meals.length).sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0))[0];
     return p ? { ...p, dailyCalories: num(p.dailyCalories) || num(p.dailyCalorieTarget) || int(profile?.dailyCalorieGoal), macros: p.macros || {}, tips: Array.isArray(p.tips) ? p.tips : [] } : null;
@@ -1994,7 +2356,7 @@ function App() {
 
     <main class="wrap" key=${tab}>
       ${loading ? html`<div class="splash" style="min-height:50vh"><${Spinner} s=${32} c="or" /></div>`
-        : tab === "resumo" ? html`<${Dashboard} user=${user} profile=${profile} aiState=${aiState} meals=${meals} water=${water} plan=${plan} weights=${weights} go=${go} openMeal=${setMealOpen} openHistory=${() => setHistoryOpen(true)} openWeight=${() => setWeightOpen(true)} />`
+        : tab === "resumo" ? html`<${Dashboard} user=${user} profile=${profile} aiState=${aiState} meals=${meals} water=${water} plan=${plan} weights=${weights} reports=${reports} go=${go} openMeal=${setMealOpen} openHistory=${() => setHistoryOpen(true)} openWeight=${() => setWeightOpen(true)} />`
         : tab === "analisar" ? html`<${Analyze} user=${user} profile=${profile} meals=${meals} go=${go} />`
         : tab === "plano" ? html`<${PlanView} user=${user} profile=${profile} plan=${plan} meals=${meals} go=${go} />`
         : tab === "cozinha" ? html`<${Kitchen} user=${user} profile=${profile} plan=${plan} shopping=${shopping} pantryDoc=${pantryDoc} recipes=${recipes} section=${kitchenSection} setSection=${setKitchenSection} />`
